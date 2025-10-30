@@ -11,7 +11,7 @@ from shapely.geometry import MultiPoint, Point
 from geopy.distance import great_circle
 import pandas as pd
 import numpy as np
-import geopandas as gpd\
+import geopandas as gpd
 import matplotlib.pyplot as plt
 
 # Coordinates
@@ -63,6 +63,6 @@ ax = rep_points_gdf.plot(
     alpha=0.2,        # more transparency
 )
 #ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
-plt.title("Points in Edinburgh")
+plt.title("Points Of Interest in Edinburgh")
 plt.show()
 
