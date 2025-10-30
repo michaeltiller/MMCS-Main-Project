@@ -12,7 +12,7 @@ import geopandas as gpd
 import os
 import matplotlib.pyplot as plt
 from geopy.distance import great_circle
-from shapely.geometry import MultiPoint
+from shapely.geometry import MultiPoint, Point
 from scipy.spatial import cKDTree
 
 
@@ -47,7 +47,6 @@ num_clusters = len(set(cluster_labels))
 clusters = pd.Series([coords[cluster_labels == n] for n in range(num_clusters)])
 print('Number of clusters: {}'.format(num_clusters))
 
-
 def get_centermost_point(cluster):
     centroid = (MultiPoint(cluster).centroid.x, MultiPoint(cluster).centroid.y)
     centermost_point = min(cluster, key=lambda point: great_circle(point, centroid).m)
@@ -56,6 +55,12 @@ centermost_points = clusters.map(get_centermost_point)
 
 lats, lons = zip(*centermost_points)
 rep_points = pd.DataFrame({'lon':lons, 'lat':lats})
+
+
+
+
+
+
 
 
 kmeandf  = gpd.GeoDataFrame(rep_points, geometry=gpd.points_from_xy(rep_points.lon, rep_points.lat), crs="EPSG:4326")
