@@ -75,7 +75,7 @@ plt.show()
 # read the trip data from csv into dataframes
 #for now only look at 2021 data
 filenames = glob.glob("*2021*.csv", root_dir="cyclehire-cleandata") #regex
-trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f ),nrows =1) for f in filenames  ])
+trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f )) for f in filenames  ])
 
 # we consider a start location and an end location as two different "units" of demand
 # i.e. there is a demand of one wherever the trip started and a demand of one wherever the trip ended
@@ -104,8 +104,10 @@ demand_per_loc[locs_with_demand.values] = locs_with_demand.counts
 DATA_FOLDER = "gen_data"
 if not os.path.exists(DATA_FOLDER): 
     os.mkdir(DATA_FOLDER)
-folder = path(DATA_FOLDER, timestamp())
-os.mkdir(folder)
 
-np.save(path(folder, "demand"), demand_per_loc)
+stamp = timestamp()
+print(f"Writing demand {demand_per_loc.shape} with timestamp:{stamp}")
+
+os.mkdir(path(DATA_FOLDER, stamp))
+np.save(path(DATA_FOLDER, stamp, "demand"), demand_per_loc)
 
