@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from helper_functions import *
 import  glob, os
 from scipy.spatial import cKDTree
+import contextily as ctx
 
 
 ########### get the potential locations for the bike stations ##############
@@ -33,7 +34,7 @@ coords = pois[['lat', 'lon']].to_numpy()
 
 
 
-num_clusters = 60  
+num_clusters = 100
 
 kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(coords, sample_weight=pois['weights'].to_numpy())
 cluster_labels = kmeans.labels_
@@ -57,7 +58,7 @@ rep_points_gdf = gpd.GeoDataFrame(
     rep_points_df, 
     geometry=[Point(xy) for xy in zip(rep_points_df['lon'], rep_points_df['lat'])],
     crs="EPSG:4326"  # WGS84 Latitude/Longitude
-)
+).to_crs(epsg=3857)
 
 ax = rep_points_gdf.plot(
     figsize=(8, 8),
@@ -65,7 +66,8 @@ ax = rep_points_gdf.plot(
     markersize=20,    # smaller dots
     alpha=0.2,        # more transparency
 )
-#ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+
+ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
 plt.title("Points Of Interest in Edinburgh")
 plt.show()
 
