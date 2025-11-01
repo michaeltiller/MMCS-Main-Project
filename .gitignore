@@ -2,3 +2,4 @@ problem.lp
 rw.py
 problem.mps
 __pycache__/*
+gen_data/*
