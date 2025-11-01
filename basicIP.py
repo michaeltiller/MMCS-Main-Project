@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from time import perf_counter
 from helper_functions import *
-xp.init('C:/xpressmp//bin/xpauth.xpr')
+# xp.init('C:/xpressmp//bin/xpauth.xpr')
 prob = xp.problem("Most_Basic_Version") 
 
 #read in data here as np.arrays
@@ -44,15 +44,15 @@ solve_start = perf_counter()
 prob.solve()
 solve_end = perf_counter()
 solve_time = solve_end-solve_start
-print(f"Solved in {solve_time:.2f} seconds")
+print(f"Solved in {solve_time:.2f} seconds with {demand.shape[0]:,.0f} variables")
 #mip gap 
 print(f"{get_MIP_gap(prob)=:.2f}")
 # look at the solution
-build_sol = pd.DataFrame(
-    {"built": [prob.getSolution(i) for i in build],
-     "demand": demand}
-    , index=[ str(i) for i in build] )
-print(build_sol)
+# build_sol = pd.DataFrame(
+#     {"built": [prob.getSolution(i) for i in build],
+#      "demand": demand}
+#     , index=[ str(i) for i in build] )
+# print(build_sol)
 
 
 
