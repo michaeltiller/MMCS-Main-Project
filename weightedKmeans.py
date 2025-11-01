@@ -9,6 +9,7 @@ from helper_functions import *
 import  glob, os
 from scipy.spatial import cKDTree
 import contextily as ctx
+from time import perf_counter
 
 
 ########### get the potential locations for the bike stations ##############
@@ -20,23 +21,43 @@ import contextily as ctx
 
 # Coordinates
 pois = pd.read_csv("edinburgh_pois.csv")
-pois['weights'] = 1
-pois['weights'] = np.where(pois['category'] == 'library', 1, pois['weights'])
-pois['weights'] = np.where(pois['category'] == 'residential', 1, pois['weights'])
-pois['weights'] = np.where(pois['category'] == 'hospital', 2, pois['weights'])
-pois['weights'] = np.where(pois['category'] == 'school', 2, pois['weights'])
+
+def designate_weight(cat):
+    """designate a POI's weight based off it's category"""
+    if cat in ("university", "commercial"):
+        return 3
+    elif cat in ("school", "hospital"):
+        return 2
+    elif cat in ("residential",  "library"):
+        return 1
+    else:
+        return 1
+
+# Sorry Michael i just hated this code
+# pois['weights'] = 1
+# pois['weights'] = np.where(pois['category'] == 'library', 1, pois['weights'])
+# pois['weights'] = np.where(pois['category'] == 'residential', 1, pois['weights'])
+# pois['weights'] = np.where(pois['category'] == 'hospital', 2, pois['weights'])
+# pois['weights'] = np.where(pois['category'] == 'school', 2, pois['weights'])
 
 
-pois['weights'] = np.where(pois['category'] == 'university', 3, pois['weights'])
-pois['weights'] = np.where(pois['category'] == 'commercial', 3, pois['weights'])
+# pois['weights'] = np.where(pois['category'] == 'university', 3, pois['weights'])
+# pois['weights'] = np.where(pois['category'] == 'commercial', 3, pois['weights'])
+#The output of the new way is the same
+# assert ( pois['weights'] == pois['category'].apply(designate_weight) ).all()
 
+poi_weights = pois['category'].apply(designate_weight)
+
+#go from df to np ndarray
 coords = pois[['lat', 'lon']].to_numpy()
 
 
 
 num_clusters = 100
-
-kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(coords, sample_weight=pois['weights'].to_numpy())
+s = perf_counter()
+kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(coords, sample_weight=poi_weights)
+t = perf_counter()
+print(f"KMeans took {t-s:.0f} seconds")
 cluster_labels = kmeans.labels_
 
 
@@ -48,12 +69,17 @@ def get_centermost_point(cluster):
     centermost_point = min(cluster, key=lambda point: great_circle(point, centroid).m)
     return tuple(centermost_point)
 
+s = perf_counter()
 centermost_points = clusters.map(get_centermost_point)
+t = perf_counter()
+print(f"getting centremost points took {t-s:.0f} seconds")
 
-lats, lons = zip(*centermost_points)
-rep_points_df = pd.DataFrame({'lon': lons, 'lat': lats})
+rep_points_df = pd.DataFrame({
+    "lat":centermost_points.map(lambda tup : tup[0]), 
+    "lon":centermost_points.map(lambda tup : tup[1])
+    })
 
-# Convert to GeoDataFrame
+# # Convert to GeoDataFrame to plot a picture 
 rep_points_gdf = gpd.GeoDataFrame(
     rep_points_df, 
     geometry=[Point(xy) for xy in zip(rep_points_df['lon'], rep_points_df['lat'])],
