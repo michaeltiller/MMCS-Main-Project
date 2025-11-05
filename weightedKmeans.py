@@ -149,13 +149,13 @@ def get_distances(coords_arr):
     return dists
 
 
-# print("Starting calculating distances")
-# s = perf_counter()
-# all_dists = get_distances(centermost_points.to_numpy())
-# e = perf_counter()
-# print(f"It took {e-s:.0f} seconds with {centermost_points.shape[0]:,} records")
-# # all_dists = x = np.load("dists 60 590 secs.npy")
-# ACCEPTABLE_DISTANCE = 5_000 # metres
+print("Starting calculating distances")
+s = perf_counter()
+all_dists = get_distances(centermost_points.to_numpy())
+e = perf_counter()
+print(f"It took {e-s:.0f} seconds with {centermost_points.shape[0]:,} records")
+# all_dists = x = np.load("dists 60 590 secs.npy")
+ACCEPTABLE_DISTANCE = 5_000 # metres
 # near = all_dists <= ACCEPTABLE_DISTANCE
 
 
@@ -202,6 +202,7 @@ stamp = timestamp()
 print(f"Writing to file with timestamp:{stamp}")
 
 os.mkdir(path(DATA_FOLDER, stamp))
+np.save(path(DATA_FOLDER, stamp, "all_dists"), all_dists)
 np.save(path(DATA_FOLDER, stamp, "demand"), demand_per_loc)
 # np.save(path(DATA_FOLDER, stamp, "near"), near)
 
