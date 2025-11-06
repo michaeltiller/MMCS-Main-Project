@@ -1,0 +1,222 @@
+from sklearn.cluster import KMeans
+from shapely.geometry import MultiPoint, Point
+from geopy.distance import great_circle
+import pandas as pd
+import numpy as np
+import geopandas as gpd
+import matplotlib.pyplot as plt
+from helper_functions import *
+import  glob, os
+from scipy.spatial import cKDTree
+import contextily as ctx
+from time import perf_counter
+import requests, ujson
+
+def designate_weight(cat):
+    """designate a POI's weight based off it's category"""
+    if cat in ("university", "commercial"):
+        return 3
+    elif cat in ("school", "hospital"):
+        return 2
+    elif cat in ("residential",  "library"):
+        return 1
+    else:
+        return 1
+
+def cluster_and_get_centremost_points(arr, num_clusters, kmeans_weights=None):
+    """Takes in an array ``arr`` of latitude and longitude, in that order,  points.
+       Performs kmeans clustering with weights ``kmeans_weights``.
+       Then returns the 'centremost' point from each cluster
+       The output is a GeoPandas dataframe"""
+    
+    if kmeans_weights is None:
+        kmeans_weights = np.ones(arr.shape[0])
+    
+    s = perf_counter()
+    kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(arr, sample_weight=kmeans_weights)
+    e = perf_counter()
+    print(f"KMeans took {e-s:.0f} seconds")
+    cluster_labels = kmeans.labels_
+
+
+
+    clusters = pd.Series([arr[cluster_labels == n] for n in range(num_clusters)])
+
+    def get_centermost_point(cluster):
+        centroid = (MultiPoint(cluster).centroid.x, MultiPoint(cluster).centroid.y)
+        centermost_point = min(cluster, key=lambda point: great_circle(point, centroid).m)
+        return tuple(centermost_point)
+
+    s = perf_counter()
+    centermost_points = clusters.map(get_centermost_point)
+    e = perf_counter()
+    print(f"getting centremost points took {e-s:.0f} seconds")
+
+    # # Convert to GeoDataFrame to plot a picture 
+    return gpd.GeoDataFrame(
+        {
+        "lat":centermost_points.map(lambda tup : tup[0]), 
+        "lon":centermost_points.map(lambda tup : tup[1])
+        }, 
+        geometry=[Point(lon, lat) for lat, lon in centermost_points],
+        crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    ).to_crs(epsg=3857)
+
+########### find which locations are "close" to each other #####################
+# we will use the osrm module for this 
+# it has a web API which takes a url with the longatudes and latitudes 
+# and returns a distance table
+def dist_from_point_basic(p, arr):
+    """get the distance from a single point ``p`` to each point in ``arr``.
+       ``arr`` must be small enough to pass into the url string for osrm
+    """
+
+    url = "http://router.project-osrm.org/table/v1/bike/"
+    #add p as the first coordinates
+    url += f"{p[1]},{p[0]};"
+    #its longitude first  <------------------
+    url += ";".join( f"{lon},{lat}" for lat, lon in arr )
+    url += "?sources=0&annotations=distance"
+
+    resp = requests.get(url)
+
+    if resp.status_code != 200:
+        raise Exception("fuck " + resp.text) 
+
+    # stored as a list within a list because there is only one source point
+    dists = ujson.loads(resp.content)["distances"][0]
+    # An annoyance is that in each chunk the first value is the dist from p to p
+    # so trim that out 
+    # this is only because p is added into the front of the array every time so it keeps calculating that
+    return np.array(dists[1:])
+
+
+def get_distances(coords_arr):
+    n_rows = coords_arr.shape[0]
+    dists = np.zeros((n_rows,n_rows))
+
+    #the we can only do so many co-ordinates at once -> break it up into batches
+    MAX_BATCH_SIZE = 325 #works, 330 is too large, try rise it further if you want
+    num_batches = np.ceil(n_rows/MAX_BATCH_SIZE)
+    # split the array into a list of num_batches arrays
+    # each small array has at most MAX_BATCH_SIZE elements
+    batched = np.array_split(coords_arr, num_batches)
+
+    
+    # i was trying to doing something more effecient than this using threading
+    # but i got blocked, I believe for sending more than one request per minute
+    print("On:")
+    for i in range(n_rows):
+        print(i)
+        dists[i,] = np.concat( [ dist_from_point_basic(coords_arr[i], batch) for batch in batched ] )
+    print()
+    return dists
+
+
+
+
+def get_historical_trips(and_end_points = False):
+    """ get the demand for each potential location.
+    returns it as a 2D array of longitude and latitude 
+     """
+    # # read the trip data from csv into dataframes
+    #for now only look at 2021 data
+    filenames = glob.glob("*2020*.csv", root_dir="cyclehire-cleandata") #regex
+    trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f )) for f in filenames  ])
+
+    # # we consider a start location and an end location as two different "units" of demand
+    # # i.e. there is a demand of one wherever the trip started and a demand of one wherever the trip ended
+    col_names = ["lon","lat"]
+    starts = trips[['start_station_longitude', 'start_station_latitude' ]]
+    starts.columns = col_names
+
+    if and_end_points:
+        ends = trips[['end_station_longitude','end_station_latitude' ]]
+        ends.columns = col_names
+        demand = pd.concat([starts,ends], ignore_index=True)
+    else:
+        demand = starts
+    
+    return gpd.GeoDataFrame(
+        {
+        "lon": demand["lon"],
+        "lat": demand["lat"]
+        },
+        geometry=[Point(tup) for tup in zip(demand["lon"], demand["lat"])],
+        crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    ).to_crs(epsg=3857)
+
+def assign_points_to_nearest_location(points, locs):
+
+    points = points[["lon", "lat"]]
+    locs = locs[["lon", "lat"]]
+
+    s = perf_counter()
+
+    dist_tree = cKDTree(locs)
+    _, nearest_loc = dist_tree.query(points, k = 1)
+
+    e = perf_counter()
+    print(f"Assigning historical demand to locations took {e-s:.0f} seconds")
+
+    return nearest_loc
+
+
+
+if __name__ == "__main__":
+
+    pois = pd.read_csv("edinburgh_pois.csv")
+
+    poi_weights = pois['category'].apply(designate_weight)
+    coords = pois[['lat', 'lon']].to_numpy()
+
+    rep_points_gdf = cluster_and_get_centremost_points(coords, 60, poi_weights)
+
+    hist_starts = get_historical_trips()
+
+
+    r = list(range(30,60))
+    rep_points_gdf = rep_points_gdf.iloc[r]
+    hist_starts = hist_starts.iloc[r]
+
+
+    near_labs = assign_points_to_nearest_location(hist_starts, rep_points_gdf)
+
+    colour_map = plt.colormaps['cool'].resampled(len(r))
+    cols = colour_map(range(rep_points_gdf.shape[0]))
+
+
+    # f, (ax1, ax2) = plt.subplots(ncols=2)
+    _, ax1 = plt.subplots()
+
+    hist_starts.to_crs(rep_points_gdf.crs).plot(
+        ax=ax1, label="Historical",
+        color=cols[near_labs],
+        markersize=20
+        ,marker="D"
+    )
+    
+    rep_points_gdf.plot(
+        ax=ax1, label="Locations",
+        color=cols,
+        markersize=20,
+        marker = "x"
+    )
+    
+    ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
+    ax1.legend()
+
+
+    # hist_starts.to_crs(rep_points_gdf.crs).plot(
+    #     ax=ax2, label="Historical",
+    #     color=cols[near_labs],
+    #     markersize=20
+    #     ,marker="D"
+    # )
+    # ctx.add_basemap(ax2, source=ctx.providers.CartoDB.Positron)
+    # ax2.legend()
+
+
+    plt.show()
+
+
