@@ -9,7 +9,7 @@ if platform.system() == "Windows":
     xp.init('C:/xpressmp//bin/xpauth.xpr')
 
 
-def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, dist_max=5 ):
+def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, dist_max=5_000 ):
 
     prob = xp.problem("First_bike_extension") 
 
@@ -31,7 +31,7 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
 
     ########### objective function #############
     prob.setObjective(
-        xp.Sum( demand[i]*bikes[i] for i in I )
+        xp.Sum( desire[i]*bikes[i] for i in I )
         , sense = xp.maximize
     )
 
@@ -75,7 +75,7 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     solve_start = perf_counter()
     prob.solve()
     solve_end = perf_counter()
-    print(f"Solved in {solve_end-solve_start:.2f} seconds with {demand.shape[0]:,f} variables")
+    print(f"Solved in {solve_end-solve_start:.2f} seconds with {desire.shape[0]:,f} variables")
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
@@ -83,8 +83,8 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
 
     # look at the solution
     solution  = pd.DataFrame({
-        "build": [ int(i) for i in prob.getSolution(build) ],
-        "bikes": [int(i) for i in prob.getSolution(bikes) ],
+        "build": np.array([ int(i) for i in prob.getSolution(build) ]),
+        "bikes": np.array([int(i) for i in prob.getSolution(bikes) ]),
         "desire": desire
     })
 
