@@ -170,19 +170,21 @@ if __name__ == "__main__":
     poi_weights = pois['category'].apply(designate_weight)
     coords = pois[['lat', 'lon']].to_numpy()
 
-    rep_points_gdf = cluster_and_get_centremost_points(coords, 60, poi_weights)
+    rep_points_gdf = cluster_and_get_centremost_points(coords, 100, poi_weights)
 
     hist_starts = get_historical_trips()
 
 
     r = list(range(30,60))
     rep_points_gdf = rep_points_gdf.iloc[r]
-    hist_starts = hist_starts.iloc[r]
+    # hist_starts = hist_starts.iloc[r]
 
 
     near_labs = assign_points_to_nearest_location(hist_starts, rep_points_gdf)
-
-    colour_map = plt.colormaps['cool'].resampled(len(r))
+    uniq, counts = np.unique(near_labs, return_counts = True)
+    # print(u)
+    print(len(counts), counts)
+    colour_map = plt.colormaps['cool'].resampled( min(len(r), 10) )
     cols = colour_map(range(rep_points_gdf.shape[0]))
 
 
@@ -192,20 +194,20 @@ if __name__ == "__main__":
     hist_starts.to_crs(rep_points_gdf.crs).plot(
         ax=ax1, label="Historical",
         color=cols[near_labs],
-        markersize=20
-        ,marker="D"
+        markersize=10
+        ,marker="."
     )
     
     rep_points_gdf.plot(
         ax=ax1, label="Locations",
         color=cols,
-        markersize=20,
+        markersize=30,
         marker = "x"
     )
     
     ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
     ax1.legend()
-
+    plt.title("Colours show assignment")
 
     # hist_starts.to_crs(rep_points_gdf.crs).plot(
     #     ax=ax2, label="Historical",
