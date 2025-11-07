@@ -6,7 +6,7 @@ import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from helper_functions import *
-import  glob, os
+import  glob, os, threading, time
 from scipy.spatial import cKDTree
 import contextily as ctx
 from time import perf_counter
@@ -73,11 +73,14 @@ def dist_from_point_basic(p, arr):
     #its longitude first  <------------------
     url += ";".join( f"{lon},{lat}" for lat, lon in arr )
     url += "?sources=0&annotations=distance"
-
+    time.sleep(2)
+    t = datetime.datetime.now()
+    print(f"requesting at {t} ") # the f strings lazy evaluate
     resp = requests.get(url)
 
     if resp.status_code != 200:
-        raise Exception("fuck " + resp.text) 
+        print("fuck " + resp.text) 
+        return np.inf
 
     # stored as a list within a list because there is only one source point
     dists = ujson.loads(resp.content)["distances"][0]
@@ -108,6 +111,43 @@ def get_distances(coords_arr):
     print()
     return dists
 
+
+def get_distances_threaded(coords_arr):
+
+    s = perf_counter()
+    n_rows = coords_arr.shape[0]
+    MAX_BATCH_SIZE = 325 #works, 330 is too large, try rise it further if you want
+    
+    col_inds_split = np.split(
+        np.arange(n_rows),
+        range(MAX_BATCH_SIZE, n_rows, MAX_BATCH_SIZE)
+    )
+
+    dists = np.zeros((n_rows,n_rows))
+    threads = []
+
+    def dist_from_point_batched(row_i,col_is):
+        dists[row_i, col_is] = dist_from_point_basic(coords_arr[row_i], coords_arr[col_is])
+
+    for row_ind in range(n_rows):
+        for col_inds in col_inds_split:
+            t = threading.Thread(
+                target=dist_from_point_batched,
+                args=(row_ind, col_inds) 
+            )
+            threads.append(t)  
+    
+    for t in threads:
+        t.start()
+        time.sleep(3) #1 request per second
+
+    for t in threads:
+        t.join()
+
+
+    e = perf_counter()
+    print(f"getting dists threaded took {e-s:.0f} seconds")
+    return dists
 
 
 
@@ -166,55 +206,60 @@ if __name__ == "__main__":
     poi_weights = pois['category'].apply(designate_weight)
     coords = pois[['lat', 'lon']].to_numpy()
 
-    locations_gdf = cluster_and_get_centremost_points(coords, 100, poi_weights)
+    locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)
 
-    hist_starts_gdf = get_historical_trips()
-
-
-    r = list(range(30,60))
-    locations_gdf = locations_gdf.iloc[r]
-    # hist_starts = hist_starts.iloc[r]
+    # hist_starts_gdf = get_historical_trips()
 
 
-    near_labs = assign_points_to_nearest_location(hist_starts_gdf, locations_gdf)
-    locs_with_demand, counts = np.unique(near_labs, return_counts = True)
-    # print(u)
-    print(len(counts), counts)
-    colour_map = plt.colormaps['cool'].resampled( min(len(r), 10) )
-    cols = colour_map(range(locations_gdf.shape[0]))
+    # r = list(range(30,60))
+    # locations_gdf = locations_gdf.iloc[r]
+    # # hist_starts = hist_starts.iloc[r]
 
 
-    # f, (ax1, ax2) = plt.subplots(ncols=2)
-    _, ax1 = plt.subplots()
+    # near_labs = assign_points_to_nearest_location(hist_starts_gdf, locations_gdf)
+    # locs_with_demand, counts = np.unique(near_labs, return_counts = True)
+    # # print(u)
+    # print(len(counts), counts)
+    # colour_map = plt.colormaps['cool'].resampled( min(len(r), 10) )
+    # cols = colour_map(range(locations_gdf.shape[0]))
 
-    hist_starts_gdf.to_crs(locations_gdf.crs).plot(
-        ax=ax1, label="Historical",
-        color=cols[near_labs],
-        markersize=10
-        ,marker="."
-    )
-    
-    locations_gdf.plot(
-        ax=ax1, label="Locations",
-        color=cols,
-        markersize=30,
-        marker = "x"
-    )
-    
-    ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
-    ax1.legend()
-    plt.title("Colours show assignment")
 
-    # hist_starts.to_crs(rep_points_gdf.crs).plot(
-    #     ax=ax2, label="Historical",
+    # # f, (ax1, ax2) = plt.subplots(ncols=2)
+    # _, ax1 = plt.subplots()
+
+    # hist_starts_gdf.to_crs(locations_gdf.crs).plot(
+    #     ax=ax1, label="Historical",
     #     color=cols[near_labs],
-    #     markersize=20
-    #     ,marker="D"
+    #     markersize=10
+    #     ,marker="."
     # )
-    # ctx.add_basemap(ax2, source=ctx.providers.CartoDB.Positron)
-    # ax2.legend()
+    
+    # locations_gdf.plot(
+    #     ax=ax1, label="Locations",
+    #     color=cols,
+    #     markersize=30,
+    #     marker = "x"
+    # )
+    
+    # ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
+    # ax1.legend()
+    # plt.title("Colours show assignment")
+
+    # # hist_starts.to_crs(rep_points_gdf.crs).plot(
+    # #     ax=ax2, label="Historical",
+    # #     color=cols[near_labs],
+    # #     markersize=20
+    # #     ,marker="D"
+    # # )
+    # # ctx.add_basemap(ax2, source=ctx.providers.CartoDB.Positron)
+    # # ax2.legend()
 
 
-    plt.show()
+    # plt.show()
+    locs_as_tuples = locations_gdf.apply(lambda row: (row["lat"], row["lon"]), axis=1 ).to_numpy()
+    print(f"{locs_as_tuples.shape=}")
+    d = get_distances_threaded(locs_as_tuples)
+
+    print(d)
 
 
