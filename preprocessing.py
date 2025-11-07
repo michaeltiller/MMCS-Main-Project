@@ -73,9 +73,9 @@ def dist_from_point_basic(p, arr):
     #its longitude first  <------------------
     url += ";".join( f"{lon},{lat}" for lat, lon in arr )
     url += "?sources=0&annotations=distance"
-    time.sleep(2)
-    t = datetime.datetime.now()
-    print(f"requesting at {t} ") # the f strings lazy evaluate
+    # time.sleep(2)
+    # t = datetime.datetime.now()
+    # print(f"requesting at {t} ") # the f strings lazy evaluate
     resp = requests.get(url)
 
     if resp.status_code != 200:
@@ -113,7 +113,7 @@ def get_distances(coords_arr):
 
 
 def get_distances_threaded(coords_arr):
-
+    """Doesn't work"""
     s = perf_counter()
     n_rows = coords_arr.shape[0]
     MAX_BATCH_SIZE = 325 #works, 330 is too large, try rise it further if you want
@@ -256,10 +256,11 @@ if __name__ == "__main__":
 
 
     # plt.show()
-    locs_as_tuples = locations_gdf.apply(lambda row: (row["lat"], row["lon"]), axis=1 ).to_numpy()
-    print(f"{locs_as_tuples.shape=}")
-    d = get_distances_threaded(locs_as_tuples)
+    # this gets you blocked
+    # locs_as_tuples = locations_gdf.apply(lambda row: (row["lat"], row["lon"]), axis=1 ).to_numpy()
+    # print(f"{locs_as_tuples.shape=}")
+    # d = get_distances_threaded(locs_as_tuples)
 
-    print(d)
+    # print(d)
 
 
