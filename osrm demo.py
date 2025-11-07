@@ -19,3 +19,4 @@ r = requests.get(url)
 r = json.loads(r.content)
 # it gives us a lot of other stuff but we only need the distance matrix
 print(r["distances"])
+# [[0, 1905.3], [2050.5, 0]]
