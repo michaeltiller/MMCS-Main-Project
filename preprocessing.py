@@ -34,10 +34,7 @@ def cluster_and_get_centremost_points(arr, num_clusters, kmeans_weights=None):
     
     s = perf_counter()
     kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(arr, sample_weight=kmeans_weights)
-    e = perf_counter()
-    print(f"KMeans took {e-s:.0f} seconds")
     cluster_labels = kmeans.labels_
-
 
 
     clusters = pd.Series([arr[cluster_labels == n] for n in range(num_clusters)])
@@ -47,10 +44,9 @@ def cluster_and_get_centremost_points(arr, num_clusters, kmeans_weights=None):
         centermost_point = min(cluster, key=lambda point: great_circle(point, centroid).m)
         return tuple(centermost_point)
 
-    s = perf_counter()
     centermost_points = clusters.map(get_centermost_point)
     e = perf_counter()
-    print(f"getting centremost points took {e-s:.0f} seconds")
+    print(f"clustering and getting centremost points took {e-s:.0f} seconds")
 
     # # Convert to GeoDataFrame to plot a picture 
     return gpd.GeoDataFrame(
@@ -121,7 +117,7 @@ def get_historical_trips(and_end_points = False):
      """
     # # read the trip data from csv into dataframes
     #for now only look at 2021 data
-    filenames = glob.glob("*2020*.csv", root_dir="cyclehire-cleandata") #regex
+    filenames = glob.glob("*.csv", root_dir="cyclehire-cleandata") #regex
     trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f )) for f in filenames  ])
 
     # # we consider a start location and an end location as two different "units" of demand
@@ -157,7 +153,7 @@ def assign_points_to_nearest_location(points, locs):
     _, nearest_loc = dist_tree.query(points, k = 1)
 
     e = perf_counter()
-    print(f"Assigning historical demand to locations took {e-s:.0f} seconds")
+    print(f"Assigning points to locations took {e-s:.0f} seconds")
 
     return nearest_loc
 
