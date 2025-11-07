@@ -11,6 +11,8 @@ if platform.system() == "Windows":
 
 def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, dist_max=5_000 ):
 
+    # stop the big stream of text
+    xp.setOutputEnabled(False)
     prob = xp.problem("First_bike_extension") 
 
     num_locs = desire.shape[0]
@@ -69,13 +71,12 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     ########## Solving ###########
     # Write problem statement to file, for debugging
     # prob.write("problem","ips")
-
-    # xp.setOutputEnabled(True)
+ 
     print("Solving")
     solve_start = perf_counter()
     prob.solve()
     solve_end = perf_counter()
-    print(f"Solved in {solve_end-solve_start:.2f} seconds with {desire.shape[0]:,f} variables")
+    print(f"Solved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
