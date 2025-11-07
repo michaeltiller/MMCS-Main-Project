@@ -4,12 +4,12 @@ import IP_with_bikes_v1
 from preprocessing import *
 
 #  PARAMETERS  YOU CAN CHANGE THESE
-NUM_LOCATIONS =  30
+NUM_LOCATIONS =  100    
 BIKE_MAX = 50
 COST_BIKE = 580
 COST_STATION = 20_000
-BUDGET = 200_000
-DIST_MAX = 5_000
+BUDGET = 400_000
+DIST_MAX = 2_000
 
 
 ###### read in POIs 
@@ -39,24 +39,27 @@ all_dists = np.load(path(folder, "all_dists.npy"))[:NUM_LOCATIONS,:NUM_LOCATIONS
 # Run the model
 sol, mip_gap, near = IP_with_bikes_v1.create_and_solve_model(
     desire_for_locs, all_dists,
-    bike_max=50, cost_bike=580, cost_station=20_000, 
-    budget=200_000, dist_max=5_000
+    bike_max=BIKE_MAX, cost_bike=COST_BIKE, cost_station=COST_STATION, 
+    budget=BUDGET, dist_max=DIST_MAX
 )
 
-built = sol["build"].to_numpy() ==1
-print(sol)
+print(sol[sol["desire"]>0])
 
 # Colours: historical trips are the colour of the location they are assigned to
 cmap = plt.colormaps['cool'].resampled( len(locs_with_demand) )
 cols_for_locs_with_demand  = cmap(np.arange(len(locs_with_demand)))
-# locations with no demand/desire are shown in black
 cols_for_locations = np.zeros((NUM_LOCATIONS,4))
-cols_for_locations[:,3] = 1.
+# locations with no demand/desire are shown in grey
+cols_for_locations[:,:] = .5
+cols_for_locations[:,3] = 1
+
 
 cols_for_locations[locs_with_demand,:] = cols_for_locs_with_demand
 cols_for_hist_data = cols_for_locations[near_labs]
 
 
+# Plot the solution
+built = sol["build"].to_numpy() == 1
 _, ax1 = plt.subplots()
 
 hist_starts_gdf.to_crs(locations_gdf.crs).plot(
@@ -76,7 +79,7 @@ locations_gdf[~built].plot(
 locations_gdf[built].plot(
     ax=ax1, label="Station Locations",
     color=cols_for_locations[built],
-    markersize=30,
+    markersize=40,
     marker = "^"
 )
 
