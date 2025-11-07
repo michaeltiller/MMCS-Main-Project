@@ -1,6 +1,6 @@
 import numpy as np
 from helper_functions import *
-import IP_with_bikes_v1
+import IP_models
 from preprocessing import *
 
 #  PARAMETERS  YOU CAN CHANGE THESE
@@ -37,7 +37,7 @@ folder = path("good_example_data", "05 Nov 2025 03-50PM")
 all_dists = np.load(path(folder, "all_dists.npy"))[:NUM_LOCATIONS,:NUM_LOCATIONS]
 
 # Run the model
-sol, mip_gap, near = IP_with_bikes_v1.create_and_solve_model(
+sol, mip_gap, near = IP_models.create_and_solve_model(
     desire_for_locs, all_dists,
     bike_max=BIKE_MAX, cost_bike=COST_BIKE, cost_station=COST_STATION, 
     budget=BUDGET, dist_max=DIST_MAX
@@ -51,7 +51,7 @@ cols_for_locs_with_demand  = cmap(np.arange(len(locs_with_demand)))
 cols_for_locations = np.zeros((NUM_LOCATIONS,4))
 # locations with no demand/desire are shown in grey
 cols_for_locations[:,:] = .5
-cols_for_locations[:,3] = 1
+cols_for_locations[:,3] = .5
 
 
 cols_for_locations[locs_with_demand,:] = cols_for_locs_with_demand
