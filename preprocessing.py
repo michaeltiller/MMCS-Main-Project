@@ -155,8 +155,8 @@ def get_historical_trips(and_end_points = False):
     """ get the demand for each potential location.
     returns it as a 2D array of longitude and latitude 
      """
+    s = perf_counter()
     # # read the trip data from csv into dataframes
-    #for now only look at 2021 data
     filenames = glob.glob("*.csv", root_dir="cyclehire-cleandata") #regex
     trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f )) for f in filenames  ])
 
@@ -173,7 +173,7 @@ def get_historical_trips(and_end_points = False):
     else:
         demand = starts
     
-    return gpd.GeoDataFrame(
+    df = gpd.GeoDataFrame(
         {
         "lon": demand["lon"],
         "lat": demand["lat"]
@@ -182,8 +182,19 @@ def get_historical_trips(and_end_points = False):
         crs="EPSG:4326"  # WGS84 Latitude/Longitude
     ).to_crs(epsg=3857)
 
-def assign_points_to_nearest_location(points, locs):
+    e = perf_counter()
+    print(f"reading historical data took {e-s:.0f} seconds")
+    
+    return df
 
+def assign_points_to_nearest_location(points, locs):
+    """
+    Does what it says on the tin. 
+    Output is an array ``arr`` 
+    where ``arr[i]`` gives the index of the location that point ``i`` was assigned to
+
+    Ensure both ``points`` and ``locs`` have columns ``lon```and ``lat``.
+    """
     points = points[["lon", "lat"]]
     locs = locs[["lon", "lat"]]
 
@@ -197,7 +208,61 @@ def assign_points_to_nearest_location(points, locs):
 
     return nearest_loc
 
+def show_elbow_of_weighted_kmeans(locs, k_values = np.arange(1,10+1), loc_weights = None):
+    """
+    Performs weighted k means repeatedly on ``locs`` using each value in ``k_values`` as the number of 
+    clusters, k.
+    Plots and returns the SS dists from the centroids, also known as the entropy, for each choice of k.
 
+    """
+    s = perf_counter()
+    
+    k_values = np.array(k_values)
+    get_entropy  = np.vectorize(
+        lambda k: KMeans(k, random_state=0).fit(locs, sample_weight=loc_weights).inertia_
+        )
+    entropies = get_entropy(k_values)
+
+    e = perf_counter()
+    print(f"Getting elbow plot took {e-s:.0f} seconds for {len(k_values)} values of k")
+
+    _, ax = plt.subplots()
+    ax.plot(k_values, entropies, "b-")
+    ax.scatter(k_values, entropies, c="red")
+    ax.set_xlabel("K")
+    plt.title("Sum of square dists to centroid")
+    plt.show()
+
+    return entropies
+
+def create_colours_for_locs_and_assignments(locs,assign_labs, cmap_name = "cool"):
+    """
+    This is for colour assignment when there are certain number of locations ``locs`` 
+    and many other points have been assigned to a unique location, as recorded in ``assign_labs``.
+
+    E.g two locations and five points a possible input is assign_labs=[0,1,1,0,0] and possible output is 
+    ["blue", "green"], ["blue","green","green","blue","blue"]
+
+    Locations with no points assigned are coloured in gray
+    """
+    locs_with_assignments = np.unique(assign_labs)
+    # will need to do something here when number of locs is large
+    # the colours will differ by increasingly smpall degrees
+    # an alternative is to limit the size of the cmap to say 20 and shuffle the indexes before being passed
+    # so location 5 wont be mapped to index 4 anymore and wont get a colour similar to location 6
+    cmap = plt.colormaps[cmap_name].resampled( len(locs_with_assignments) )
+    cols_for_locs_with_demand  = cmap(np.arange(len(locs_with_assignments)))
+
+
+    cols_for_locs = np.zeros((len(locs),4))
+    # locations with no demand/desire are shown in grey
+    cols_for_locs[:,:] = .5
+
+    cols_for_locs[locs_with_assignments,:] = cols_for_locs_with_demand
+
+    cols_for_points = cols_for_locs[locs_with_assignments]
+
+    return cols_for_locs, cols_for_points
 
 if __name__ == "__main__":
 
@@ -205,8 +270,9 @@ if __name__ == "__main__":
 
     poi_weights = pois['category'].apply(designate_weight)
     coords = pois[['lat', 'lon']].to_numpy()
-
-    locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)
+    print(coords.shape)
+    sum_sq = show_elbow_of_weighted_kmeans(coords, range(1, 50+1), poi_weights)
+    # locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)
 
     # hist_starts_gdf = get_historical_trips()
 
@@ -263,4 +329,29 @@ if __name__ == "__main__":
 
     # print(d)
 
+    # locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)["geometry"]
+    num_regions = 10
 
+    locs2_gdf = gpd.GeoDataFrame({
+        "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
+        "lat": coords[:,0],
+        "lon": coords[:,1]
+        },
+        geometry=[Point(lon, lat) for lat, lon in coords],
+        crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    ).to_crs(epsg=3857)
+
+    col_regions, col_region_points = create_colours_for_locs_and_assignments(
+        np.arange(num_regions), locs2_gdf["region"]
+    )
+
+
+    regions_gdf = locs2_gdf.dissolve(by="region")
+
+    _, ax = plt.subplots()
+    regions_gdf.convex_hull.plot(ax=ax,
+                                alpha = .2, color=col_regions)
+    regions_gdf.convex_hull.boundary.plot(ax=ax, color="black")
+    regions_gdf.plot(ax=ax, color = col_region_points)
+    ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+    plt.show()
