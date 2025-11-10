@@ -13,7 +13,9 @@ from time import perf_counter
 import requests, ujson
 
 def designate_weight(cat):
-    """designate a POI's weight based off it's category"""
+    """designate a POI's weight based off it's category.
+    
+    Weight must be positive"""
     if cat in ("university", "commercial"):
         return 3
     elif cat in ("school", "hospital"):
@@ -184,7 +186,7 @@ def get_historical_trips(and_end_points = False):
 
     e = perf_counter()
     print(f"reading historical data took {e-s:.0f} seconds")
-    
+
     return df
 
 def assign_points_to_nearest_location(points, locs):
@@ -235,35 +237,28 @@ def show_elbow_of_weighted_kmeans(locs, k_values = np.arange(1,10+1), loc_weight
 
     return entropies
 
-def create_colours_for_locs_and_assignments(locs,assign_labs, cmap_name = "cool"):
+
+def location_score(locs:gpd.GeoDataFrame):
     """
-    This is for colour assignment when there are certain number of locations ``locs`` 
-    and many other points have been assigned to a unique location, as recorded in ``assign_labs``.
-
-    E.g two locations and five points a possible input is assign_labs=[0,1,1,0,0] and possible output is 
-    ["blue", "green"], ["blue","green","green","blue","blue"]
-
-    Locations with no points assigned are coloured in gray
+    Implements the L score for a location
     """
-    locs_with_assignments = np.unique(assign_labs)
-    # will need to do something here when number of locs is large
-    # the colours will differ by increasingly smpall degrees
-    # an alternative is to limit the size of the cmap to say 20 and shuffle the indexes before being passed
-    # so location 5 wont be mapped to index 4 anymore and wont get a colour similar to location 6
-    cmap = plt.colormaps[cmap_name].resampled( len(locs_with_assignments) )
-    cols_for_locs_with_demand  = cmap(np.arange(len(locs_with_assignments)))
+    z_cat = locs["cat"].apply(designate_weight)
+
+    return z_cat
+
+def distribute_regional_demand_by_L_score(regions, locations):
+    """
+    takes in a ``regions`` data frame with a demand and L_score and a 
+    ``locations`` data frame with a region and L_score column. 
+
+    It assigns regional demand to each location proportional to the location's L_score over the regional L_score.
+    """
+    # location score is positive so a region's total is positive 
+    demand_per_l_score_unit = regions["demand"] / regions["L_score"]
+    return np.ceil( demand_per_l_score_unit[locations["region"]] * locations["L_score"] )
 
 
-    cols_for_locs = np.zeros((len(locs),4))
-    # locations with no demand/desire are shown in grey
-    cols_for_locs[:,:] = .5
-
-    cols_for_locs[locs_with_assignments,:] = cols_for_locs_with_demand
-
-    cols_for_points = cols_for_locs[locs_with_assignments]
-
-    return cols_for_locs, cols_for_points
-
+    
 if __name__ == "__main__":
 
     pois = pd.read_csv("edinburgh_pois.csv")
@@ -332,7 +327,7 @@ if __name__ == "__main__":
     # locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)["geometry"]
     num_regions = 10
 
-    locs2_gdf = gpd.GeoDataFrame({
+    locations_gdf = gpd.GeoDataFrame({
         "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
         "lat": coords[:,0],
         "lon": coords[:,1]
@@ -342,11 +337,11 @@ if __name__ == "__main__":
     ).to_crs(epsg=3857)
 
     col_regions, col_region_points = create_colours_for_locs_and_assignments(
-        np.arange(num_regions), locs2_gdf["region"]
+        np.arange(num_regions), locations_gdf["region"]
     )
 
 
-    regions_gdf = locs2_gdf.dissolve(by="region")
+    regions_gdf = locations_gdf.dissolve(by="region")
 
     _, ax = plt.subplots()
     regions_gdf.convex_hull.plot(ax=ax,
