@@ -220,9 +220,12 @@ def show_elbow_of_weighted_kmeans(locs, k_values = np.arange(1,10+1), loc_weight
     s = perf_counter()
     
     k_values = np.array(k_values)
+
+    # Making this into a numpy ufunc so it _might_ run faster
     get_entropy  = np.vectorize(
         lambda k: KMeans(k, random_state=0).fit(locs, sample_weight=loc_weights).inertia_
         )
+    
     entropies = get_entropy(k_values)
 
     e = perf_counter()
@@ -242,6 +245,7 @@ def location_score(locs:gpd.GeoDataFrame):
     """
     Implements the L score for a location
     """
+    # GH will give us more stuff for here
     z_cat = locs["cat"].apply(designate_weight)
 
     return z_cat
