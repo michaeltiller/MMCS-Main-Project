@@ -262,6 +262,51 @@ def distribute_regional_demand_by_L_score(regions, locations):
     return np.ceil( demand_per_l_score_unit[locations["region"]] * locations["L_score"] )
 
 
+def haversine_np(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees)
+    
+    All args must be of equal length. 
+
+    Source: https://stackoverflow.com/questions/29545704/fast-haversine-approximation-python-pandas
+    """
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    
+    a = np.sin(dlat/2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2.0)**2
+    
+    c = 2 * np.arcsin(np.sqrt(a))
+    km = 6378.137 * c
+    return km
+
+
+def get_dists_gps(df, memory_intense = False ):
+    """
+    gets the distance matrix, using gps distance, of the points given by the ``lat`` and ``lon`` columns of ``df``.
+
+    Should take ~ 1 min for 33K.
+
+    The option ``memory_intense`` may or may not be more time-efficient but seems to max out my 8GB of RAM.
+    """
+    if memory_intense:
+        lon_lat= df[["lon","lat"]]
+
+        def wrapper(tup, **kwargs):
+            return haversine_np(*tup, **kwargs )
+
+        return lon_lat.apply(
+            func = wrapper, lat2 =df["lat"].values, lon2 = df["lon"].values, axis = 1
+        ).to_numpy()
+    
+    else:
+        d = np.zeros( (df.shape[0], df.shape[0]) )
+        for i, (lon, lat) in enumerate(zip(df["lon"], df["lat"])):
+            d[i,] =  haversine_np(lon, lat, df["lon"], df["lat"])
+        return d
+
     
 if __name__ == "__main__":
 
@@ -269,8 +314,8 @@ if __name__ == "__main__":
 
     poi_weights = pois['category'].apply(designate_weight)
     coords = pois[['lat', 'lon']].to_numpy()
-    print(coords.shape)
-    sum_sq = show_elbow_of_weighted_kmeans(coords, range(1, 50+1), poi_weights)
+    # print(coords.shape)
+    # sum_sq = show_elbow_of_weighted_kmeans(coords, range(1, 50+1), poi_weights)
     # locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)
 
     # hist_starts_gdf = get_historical_trips()
@@ -329,28 +374,46 @@ if __name__ == "__main__":
     # print(d)
 
     # locations_gdf = cluster_and_get_centremost_points(coords, 9, poi_weights)["geometry"]
-    num_regions = 10
+    # num_regions = 10
 
+    # locations_gdf = gpd.GeoDataFrame({
+    #     "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
+    #     "lat": coords[:,0],
+    #     "lon": coords[:,1]
+    #     },
+    #     geometry=[Point(lon, lat) for lat, lon in coords],
+    #     crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    # ).to_crs(epsg=3857)
+
+    # col_regions, col_region_points = create_colours_for_locs_and_assignments(
+    #     np.arange(num_regions), locations_gdf["region"]
+    # )
+
+
+    # regions_gdf = locations_gdf.dissolve(by="region")
+
+    # _, ax = plt.subplots()
+    # regions_gdf.convex_hull.plot(ax=ax,
+    #                             alpha = .2, color=col_regions)
+    # regions_gdf.convex_hull.boundary.plot(ax=ax, color="black")
+    # regions_gdf.plot(ax=ax, color = col_region_points)
+    # ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+    # plt.show()
     locations_gdf = gpd.GeoDataFrame({
-        "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
+        "name":pois["name"],
+        # "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
         "lat": coords[:,0],
-        "lon": coords[:,1]
+        "lon": coords[:,1],
+        "cat": pois["category"]
         },
         geometry=[Point(lon, lat) for lat, lon in coords],
         crs="EPSG:4326"  # WGS84 Latitude/Longitude
     ).to_crs(epsg=3857)
 
-    col_regions, col_region_points = create_colours_for_locs_and_assignments(
-        np.arange(num_regions), locations_gdf["region"]
-    )
-
-
-    regions_gdf = locations_gdf.dissolve(by="region")
-
-    _, ax = plt.subplots()
-    regions_gdf.convex_hull.plot(ax=ax,
-                                alpha = .2, color=col_regions)
-    regions_gdf.convex_hull.boundary.plot(ax=ax, color="black")
-    regions_gdf.plot(ax=ax, color = col_region_points)
-    ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
-    plt.show()
+    l = locations_gdf.iloc[0:3]
+    print(l.shape)
+    s = perf_counter()
+    dd= get_dists_gps(l)
+    e = perf_counter()
+    print(f"get_dists_gps took {e-s:.0f} secs")
+    print(dd)
