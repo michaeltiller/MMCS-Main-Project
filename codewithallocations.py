@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Nov 15 19:49:10 2025
+
+@author: micha
+"""
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -81,9 +88,18 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
         , dtype=xp.npvar
     )
     
-
+    # allocated = [prob.addVariable(name=f'allocated_{i}_{j}', vartype=xp.binary)
+    #          for i in I for j in I]
     
-   
+    allocated = np.array(
+    [[prob.addVariable(name=f'allocated_{i}_{j}', vartype=xp.binary) for j in I]
+     for i in I]
+    )
+    
+    u = np.array(
+    [prob.addVariable(name = f"u_{i}", vartype = xp.integer, lb=0, ub=num_locs) for i in I]
+    , dtype=xp.npvar
+)
     ########### objective function #############
  
     prob.setObjective(
@@ -116,12 +132,31 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     )
     
     
-    near = dist_mat <= dist_max
+    for i in I:
+        for j in I:
+            prob.addConstraint(allocated[i,j] <= build[i])
+            prob.addConstraint(allocated[i,j] <= build[j])
+    
     prob.addConstraint(
-        build[i] <= xp.Sum( near[i,j]*build[j] for j in I if j != i)
-        for i in I
+        build[j] == xp.Sum(allocated[j, i] for i in I) for j in I 
     )
-
+    
+    prob.addConstraint(
+        allocated[i, j] + allocated[j, i] <= 1 for i in I for j in I
+    )
+    
+    # Distance constraints
+    prob.addConstraint( 
+        build[j] * dist_min <= xp.Sum(allocated[j, i] * dist_mat[i, j] for i in I)
+        for j in I 
+    )
+    prob.addConstraint( 
+        build[j] * dist_max >= xp.Sum(allocated[j, i] * dist_mat[i, j] for i in I)
+        for j in I 
+    )
+    
+  
+    
     
  
     ########## Solving ###########
@@ -146,7 +181,22 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     })
     
     
+    alloc_solution = np.zeros_like(allocated, dtype=int)
 
+    temp = prob.getSolution(allocated)
+    
+    for i in I:
+        for j in I:
+            alloc_solution[i, j] = int(temp[i, j])
+
+    # Put into a DataFrame for readability
+    alloc_df = pd.DataFrame(
+        alloc_solution,
+        columns=[f"to_{j}" for j in I],
+        index=[f"from_{i}" for i in I]
+    )
+        
+   
     # return the pertient info that was not inputted
     return solution, MIP_gap, alloc_df
 
@@ -188,7 +238,33 @@ for i, row in df.iterrows():
         popup=folium.Popup(popup_text, max_width=250)
     ).add_to(m)
 
+alloc_mat = alloc_df.values
 
+for i in range(len(df)):
+    for j in range(len(df)):
+        if alloc_mat[i, j] == 1:
+            # Coordinates of the two stations
+            lat_i, lon_i = df.loc[i, ['lat', 'lon']]
+            lat_j, lon_j = df.loc[j, ['lat', 'lon']]
+
+            # Add a polyline for the allocation
+            folium.PolyLine(
+                locations=[(lat_i, lon_i), (lat_j, lon_j)],
+                color="blue",
+                weight=3,
+                opacity=0.6,
+                tooltip=f"{i} → {j}"
+            ).add_to(m)
+m.save('bike_stations.html')
+
+
+bad_edges = []
+for i in range(len(df)):
+    for j in range(len(df)):
+        if alloc_mat[i,j] == 1 and (df.loc[i,'build']==0 or df.loc[j,'build']==0):
+            bad_edges.append((i,j))
+
+bad_edges
 
 # Optional: add heatmap for demand
 heat_data = df[['lat', 'lon', 'desire']].values.tolist()
