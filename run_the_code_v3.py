@@ -48,6 +48,20 @@ locations_gdf = gpd.GeoDataFrame(
 
 
 
+# get the old demand ####
+hist_starts_gdf = get_historical_trips()
+near_labs = assign_points_to_nearest_location(hist_starts_gdf, locations_gdf)
+
+# Use the number of trips that started nearby as a proxy for "desire"/"demand"
+locs_with_demand, counts = np.unique(near_labs, return_counts = True)
+
+desire_for_locs = np.zeros(len(locations_gdf))
+desire_for_locs[locs_with_demand] = counts
+
+locations_gdf["old Demand"] = desire_for_locs
+#####
+
+
 #### Get Distances #########
 
 
@@ -59,7 +73,7 @@ dist = dist * 1000
 
 dist_mat = dist
 
-def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, rev_per_bike,dist_min =100, dist_max=5_000):
+def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, rev_per_bike,dist_min =100, dist_min_center = 100, dist_max=5_000, city_centre_radius= 1000):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
@@ -116,9 +130,44 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     )
     
     
+    centre_lat_lon = np.radians(np.array([55.9486, -3.1999]))
+    dist_to_centre = np.array([haversine(latlon, centre_lat_lon) for latlon in lat_lon]) * 1000 
+    
+    is_city_center = dist_to_centre <= city_centre_radius
+    
     near = dist_mat <= dist_max
+    
+    
     prob.addConstraint(
-        build[i] <= xp.Sum( near[i,j]*build[j] for j in I if j != i)
+        build[i] <= xp.Sum( near[i,j] *build[j] for j in I if j != i)
+        for i in I
+    )
+    
+    # Seperate min distance constraint for inside city centre 
+    
+    too_close_center = np.zeros_like(dist_mat, dtype=int)
+    too_close_outside = np.zeros_like(dist_mat, dtype=int)
+
+    for i in I:
+        for j in I:
+            if i < j:
+                if is_city_center[i] and is_city_center[j]:
+                    if dist_mat[i,j] < dist_min_center:
+                        too_close_center[i,j] = 1
+                        too_close_center[j,i] = 1
+                else:
+                    if dist_mat[i,j] < dist_min:
+                        too_close_outside[i,j] = 1
+                        too_close_outside[j,i] = 1
+
+    # City centre min-distance constraint
+    prob.addConstraint(
+        build[i] + xp.Sum(too_close_center[i,j]*build[j] for j in I if j != i) <= 1
+        for i in I
+    )
+    # Outside / mixed min-distance constraint
+    prob.addConstraint(
+        build[i] + xp.Sum(too_close_outside[i,j]*build[j] for j in I if j != i) <= 1
         for i in I
     )
 
@@ -142,21 +191,25 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     solution  = pd.DataFrame({
         "build": np.array([ int(i) for i in prob.getSolution(build) ]),
         "bikes": np.array([int(i) for i in prob.getSolution(bikes) ]),
-        "desire": desire
+        "desire": desire,
+        "city_center": is_city_center
+
     })
     
     
 
     # return the pertient info that was not inputted
-    return solution, MIP_gap, alloc_df
+    return solution, MIP_gap
 
 
-demand = locations_gdf['prediced_Start_Trip_Counts'] + locations_gdf['prediced_end_Trip_Counts'] 
+#demand = locations_gdf['prediced_Start_Trip_Counts'] + locations_gdf['prediced_end_Trip_Counts'] 
+demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.5 + locations_gdf['old Demand'] * 0.5
 
-sol, mip, alloc_df = create_and_solve_model(
+
+sol, mip = create_and_solve_model(
     desire=demand, dist_mat=dist, bike_max=50,
-    cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
-    dist_min = 700, dist_max =6000)
+    cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,dist_min_center = 500, 
+    dist_min = 1000, dist_max =1500, city_centre_radius = 2000)
 
 
 finallocs = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
@@ -175,6 +228,8 @@ for i, row in df.iterrows():
         f"<b>Build station:</b> {bool(row['build'])}<br>"
         f"<b>Bikes:</b> {row['bikes']}<br>"
         f"<b>Demand:</b> {row['desire']}<br>"
+        f"<b>City Centre:</b> {'Yes' if row['city_center'] else 'No'}<br>"
+
         f"<b>Index:</b> {i}"
     )
 
@@ -188,6 +243,8 @@ for i, row in df.iterrows():
         popup=folium.Popup(popup_text, max_width=250)
     ).add_to(m)
 
+
+m.save('bike_stations.html')
 
 
 # Optional: add heatmap for demand
