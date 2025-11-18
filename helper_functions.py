@@ -1,6 +1,7 @@
 import os, datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import time, requests
 def path( *args, **kwargs):
      """returns an OS independent path out of its arguments"""
      return os.path.join(*args, **kwargs)
@@ -52,3 +53,34 @@ def create_colours_for_locs_and_assignments(locs,assignments, cmap_name = "cool"
     cols_for_points = cols_for_locs[assignments]
 
     return cols_for_locs, cols_for_points
+
+def send_request(url, params=None, return_json=True):
+    """
+    A wrapper to send GET requests to ``URL`` with optional ``params``.
+    This will return a ``Response`` object unless ``return_json=True`` in which case
+    a conversion is attempted.
+    """
+    #slow request rate
+    time.sleep(1)
+    # idk what these are but they were in the demo
+    headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+    }
+    #send request and recieve a response
+    resp = requests.request('GET', url, headers=headers, params=params)
+
+    # Gracefully handle errors
+    if resp.status_code != 200:
+
+        msg = f"Fuck \t Code:{resp.status_code} "
+
+        if resp.status_code == 400:
+            msg+= "\n" + resp.json()["message"]
+        
+        raise Exception(msg)
+
+    if return_json :
+        return resp.json()
+    
+    return resp
