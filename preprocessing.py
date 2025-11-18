@@ -11,6 +11,8 @@ from scipy.spatial import cKDTree
 import contextily as ctx
 from time import perf_counter
 import requests, ujson
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
 
 def designate_weight(cat):
     """designate a POI's weight based off it's category.
@@ -326,7 +328,7 @@ def read_data_from_api():
     # send off a request for page one just to get the chain started
     url = 'https://roadtraffic.dft.gov.uk/api/average-annual-daily-flow'
     params = {
-    'page[size]': 20_000, # keep increasing this until something breaks
+    'page[size]': 30_000, # keep increasing this until something breaks
     "page[number]":1,
     # "filter[year]":'2024'
     'filter[region_id]':3, # Scotland
@@ -391,6 +393,72 @@ def read_traffic_data():
 
     return traffic
 
+
+def predict_bike_count_MLP( new_x, show_plot=False):
+    """
+    This predicts bike count data from the longitude and latitude of ``new_x``.
+    It does this by looking at recent historical bike traffic at junctions in Edinburgh.
+    The model used was a MultiLayer Perceptron - a simple neural network.
+
+    Right now the prediction is not impressive but I think we have reached the point of diminishing returns.
+    """
+
+    traffic = read_traffic_data()
+
+    train_X = traffic[["latitude", "longitude"]].to_numpy()
+    train_y =  traffic["pedal_cycles"].to_numpy()
+
+    # scaling the data improved performance
+    scaler = StandardScaler()
+    train_X = scaler.fit(train_X).transform(train_X)
+
+    print(f"Using {train_X.shape[0]:,} obs to predict {new_x.shape[0]} outcomes")
+
+
+    def plot_preds_against_gps( y_pred, title=""):
+        """Plot predictions on training data against training responses"""
+        lat, lon = traffic["latitude"], traffic["latitude"]
+        y  = traffic["pedal_cycles"]
+        _, (ax1, ax2) = plt.subplots(ncols=2)
+        ax1.scatter(lat, y, color="black")
+        ax2.scatter(lon, y, color="black")
+        
+        ax1.scatter(lat, y_pred, color="red")
+        ax2.scatter(lon, y_pred, color="red")
+
+        plt.title(title)
+        plt.show()
+
+    mlp_mod = MLPRegressor(hidden_layer_sizes=(75, 50), solver='lbfgs',
+                        activation='relu', max_iter= 10_000)
+    mlp_mod.fit(train_X, train_y)
+
+    if show_plot:
+        plot_preds_against_gps(mlp_mod.predict(train_X), "basic MLP")
+
+
+    # other approaches I tried was poisson regression and a random NN
+    # import sklearn
+    # poisson_mod = sklearn.linear_model.PoissonRegressor()
+    # poisson_mod.fit(train_X, train_y)
+    # plot_preds_against_gps( poisson_mod.predict( train_X), "poisson")
+
+    # import keras
+    # nn2 = keras.Sequential([
+    #         keras.layers.Dense(100, activation="relu"),
+    #         keras.layers.Dense(100, activation="relu"),
+    #         keras.layers.Dense(10, activation="relu"),
+    #         keras.layers.Dense(1),
+    #     ])
+    # nn2.compile(loss="mse")
+    # nn2.fit(x=train_X,y=train_y, epochs = 100, verbose=0)
+    # plot_preds_against_gps(nn2.predict(train_X), "keras nn")
+
+
+    # ensure that the new data is on the scale the model expects
+    new_y_pred = mlp_mod.predict( scaler.transform(new_x) )
+
+    return new_y_pred
 
 if __name__ == "__main__":
 
