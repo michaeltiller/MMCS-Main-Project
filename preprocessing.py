@@ -11,6 +11,8 @@ from scipy.spatial import cKDTree
 import contextily as ctx
 from time import perf_counter
 import requests, ujson
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
 
 def designate_weight(cat):
     """designate a POI's weight based off it's category.
@@ -307,7 +309,157 @@ def get_dists_gps(df, memory_intense = False ):
             d[i,] =  haversine_np(lon, lat, df["lon"], df["lat"])
         return d
 
+
+def read_data_from_api():
+    """
+    Read bike count data at traffic junctions 
     
+    See  https://roadtraffic.dft.gov.uk/docs/index.html 
+    """
+    print("reading from road traffic API")
+    s = perf_counter()
+
+    # The API gives the data to you in 'pages'
+    # it also gives the url to the next page or None if there is no other page
+    # this code fires off a request and just to get the url for the first page
+    # then it repeatedly requests a pages reads the data and requests the next page
+    page_data = []
+
+    # send off a request for page one just to get the chain started
+    url = 'https://roadtraffic.dft.gov.uk/api/average-annual-daily-flow'
+    params = {
+    'page[size]': 30_000, # keep increasing this until something breaks
+    "page[number]":1,
+    # "filter[year]":'2024'
+    'filter[region_id]':3, # Scotland
+    }
+    # don't even read the response initially, just get the url we landed at
+    next_url = send_request(url, params=params, return_json=False).url
+
+    while next_url is not None:
+
+        response = send_request(url=next_url)
+        next_url = response["next_page_url"]
+
+        # now we read the info from response["data"]
+        df = pd.DataFrame.from_dict(
+                response["data"]
+            )
+
+        df = df[["year", "local_authority_id", "pedal_cycles", "longitude", "latitude"]]
+        page_data.append( df.apply(pd.to_numeric) )
+
+
+    final_df = pd.concat(page_data, ignore_index = True)
+
+    e = perf_counter()
+    print(f"reading from road traffic API took {e-s:.0f} seconds with {final_df.shape[0]:,} rows")
+    return final_df
+
+
+def read_traffic_data():
+    """
+    get bike traffic at junctions in edinburgh
+    """
+    #get all traffic junction data in edinburgh
+    traffic = read_data_from_api()
+
+    # use only recent years
+    traffic = traffic[ 
+        (traffic["year"] != 2021) &
+        (traffic["year"] != 2020) &
+        (traffic["year"] >= 2018) &
+        (traffic["year"] <= 2024) 
+    ]
+
+    # make it into a Geodataframe
+    traffic = gpd.GeoDataFrame(traffic,
+                           geometry=[Point(lon, lat) for lat, lon in traffic[["latitude", "longitude"]].to_numpy() ],
+        crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    ).to_crs(epsg=3857)
+
+    # we only care about the junctions near where the stations might be
+    pois = pd.read_csv("edinburgh_pois.csv")
+    pois = gpd.GeoDataFrame(pois, 
+                        geometry=[ Point(lon, lat) for lat, lon in pois[['lat', 'lon']].to_numpy() ],
+        crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    ).to_crs(epsg=3857)
+    
+    # get the area covered by the POIs plus a 1km buffer i.e the city of Edinburgh 
+    poi_box = pois.dissolve().convex_hull.buffer(1).iloc[0]
+
+    # consider only the junctions in Edinburgh
+    traffic = traffic[ traffic.intersects(poi_box, align=False) ]
+
+    return traffic
+
+
+def predict_bike_count_MLP( new_x, show_plot=False):
+    """
+    This predicts bike count data from the longitude and latitude of ``new_x``.
+    It does this by looking at recent historical bike traffic at junctions in Edinburgh.
+    The model used was a MultiLayer Perceptron - a simple neural network.
+
+    Right now the prediction is not impressive but I think we have reached the point of diminishing returns.
+    """
+
+    traffic = read_traffic_data()
+
+    train_X = traffic[["latitude", "longitude"]].to_numpy()
+    train_y =  traffic["pedal_cycles"].to_numpy()
+
+    # scaling the data improved performance
+    scaler = StandardScaler()
+    train_X = scaler.fit(train_X).transform(train_X)
+
+    print(f"Using {train_X.shape[0]:,} obs to predict {new_x.shape[0]} outcomes")
+
+
+    def plot_preds_against_gps( y_pred, title=""):
+        """Plot predictions on training data against training responses"""
+        lat, lon = traffic["latitude"], traffic["latitude"]
+        y  = traffic["pedal_cycles"]
+        _, (ax1, ax2) = plt.subplots(ncols=2)
+        ax1.scatter(lat, y, color="black")
+        ax2.scatter(lon, y, color="black")
+        
+        ax1.scatter(lat, y_pred, color="red")
+        ax2.scatter(lon, y_pred, color="red")
+
+        plt.title(title)
+        plt.show()
+
+    mlp_mod = MLPRegressor(hidden_layer_sizes=(75, 50), solver='lbfgs',
+                        activation='relu', max_iter= 10_000)
+    mlp_mod.fit(train_X, train_y)
+
+    if show_plot:
+        plot_preds_against_gps(mlp_mod.predict(train_X), "basic MLP")
+
+
+    # other approaches I tried was poisson regression and a random NN
+    # import sklearn
+    # poisson_mod = sklearn.linear_model.PoissonRegressor()
+    # poisson_mod.fit(train_X, train_y)
+    # plot_preds_against_gps( poisson_mod.predict( train_X), "poisson")
+
+    # import keras
+    # nn2 = keras.Sequential([
+    #         keras.layers.Dense(100, activation="relu"),
+    #         keras.layers.Dense(100, activation="relu"),
+    #         keras.layers.Dense(10, activation="relu"),
+    #         keras.layers.Dense(1),
+    #     ])
+    # nn2.compile(loss="mse")
+    # nn2.fit(x=train_X,y=train_y, epochs = 100, verbose=0)
+    # plot_preds_against_gps(nn2.predict(train_X), "keras nn")
+
+
+    # ensure that the new data is on the scale the model expects
+    new_y_pred = mlp_mod.predict( scaler.transform(new_x) )
+
+    return new_y_pred
+
 if __name__ == "__main__":
 
     pois = pd.read_csv("edinburgh_pois.csv")
@@ -399,21 +551,47 @@ if __name__ == "__main__":
     # regions_gdf.plot(ax=ax, color = col_region_points)
     # ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
     # plt.show()
-    locations_gdf = gpd.GeoDataFrame({
-        "name":pois["name"],
-        # "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
-        "lat": coords[:,0],
-        "lon": coords[:,1],
-        "cat": pois["category"]
-        },
-        geometry=[Point(lon, lat) for lat, lon in coords],
-        crs="EPSG:4326"  # WGS84 Latitude/Longitude
-    ).to_crs(epsg=3857)
 
-    l = locations_gdf.iloc[0:3]
-    print(l.shape)
-    s = perf_counter()
-    dd= get_dists_gps(l)
-    e = perf_counter()
-    print(f"get_dists_gps took {e-s:.0f} secs")
-    print(dd)
+    # locations_gdf = gpd.GeoDataFrame({
+    #     "name":pois["name"],
+    #     # "region": KMeans(n_clusters=num_regions, random_state=0).fit(coords, sample_weight=poi_weights).labels_ ,
+    #     "lat": coords[:,0],
+    #     "lon": coords[:,1],
+    #     "cat": pois["category"]
+    #     },
+    #     geometry=[Point(lon, lat) for lat, lon in coords],
+    #     crs="EPSG:4326"  # WGS84 Latitude/Longitude
+    # ).to_crs(epsg=3857)
+
+    # l = locations_gdf.iloc[0:3]
+    # print(l.shape)
+    # s = perf_counter()
+    # dd= get_dists_gps(l)
+    # e = perf_counter()
+    # print(f"get_dists_gps took {e-s:.0f} secs")
+    # print(dd)
+
+    ### traffic data demo
+
+    traffic = read_traffic_data()
+
+    locals = traffic["local_authority_id"].unique() 
+
+    col_local, col_traffic = create_colours_for_locs_and_assignments(
+        locals 
+        , traffic["local_authority_id"].to_numpy()
+    )
+
+
+    _, ax = plt.subplots()
+    for loc in locals:
+        places = traffic["local_authority_id"] == loc
+        traffic[places].plot(ax=ax,
+                          color=col_traffic[places], alpha= .5
+                          , label = loc)
+    plt.legend()
+    plt.title("Traffic junctions with bikes coloured by local authority")
+    ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+
+    plt.show()
+

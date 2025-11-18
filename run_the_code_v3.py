@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov 11 19:18:32 2025
-
-@author: michael
-"""
-
 import numpy as np
 from helper_functions import *
 import IP_models

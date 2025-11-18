@@ -1,6 +1,7 @@
 import os, datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import time, requests
 def path( *args, **kwargs):
      """returns an OS independent path out of its arguments"""
      return os.path.join(*args, **kwargs)
@@ -19,31 +20,67 @@ def get_MIP_gap(prob):
           mip_gap = float('inf')
      return mip_gap
 
-def create_colours_for_locs_and_assignments(locs,assign_labs, cmap_name = "cool"):
+def create_colours_for_locs_and_assignments(locs,assignments, cmap_name = "cool"):
     """
     This is for colour assignment when there are certain number of locations ``locs`` 
-    and many other points have been assigned to a unique location, as recorded in ``assign_labs``.
+    and many other points have been assigned to a unique location, as recorded in ``assign``.
 
-    E.g two locations and five points a possible input is assign_labs=[0,1,1,0,0] and possible output is 
+    E.g two locations and five points a possible input is assign=[0,1,1,0,0] and possible output is 
     ["blue", "green"], ["blue","green","green","blue","blue"]
 
     Locations with no points assigned are coloured in gray
     """
-    locs_with_assignments = np.unique(assign_labs)
+    #find the locations that have been assigned to
+    locs_ass, assignments = np.unique(assignments, return_inverse=True)
+    
+    # get the indices of those locations in locs
+    locs_to_ind = dict( (l, i) for i, l in enumerate(locs))
+    ind_locs_ass = np.array([ locs_to_ind[l] for l in locs ])
+
     # will need to do something here when number of locs is large
     # the colours will differ by increasingly smpall degrees
     # an alternative is to limit the size of the cmap to say 20 and shuffle the indexes before being passed
     # so location 5 wont be mapped to index 4 anymore and wont get a colour similar to location 6
-    cmap = plt.colormaps[cmap_name].resampled( len(locs_with_assignments) )
-    cols_for_locs_with_demand  = cmap(np.arange(len(locs_with_assignments)))
+    cmap = plt.colormaps[cmap_name].resampled( len(locs_ass) )
+    cols_locs_ass  = cmap(np.arange(len(locs_ass)))
 
 
     cols_for_locs = np.zeros((len(locs),4))
-    # locations with no demand/desire are shown in grey
+    # locations with no assignments are shown in grey
     cols_for_locs[:,:] = .5
 
-    cols_for_locs[locs_with_assignments,:] = cols_for_locs_with_demand
-
-    cols_for_points = cols_for_locs[locs_with_assignments]
+    cols_for_locs[ind_locs_ass,:] = cols_locs_ass
+    cols_for_points = cols_for_locs[assignments]
 
     return cols_for_locs, cols_for_points
+
+def send_request(url, params=None, return_json=True):
+    """
+    A wrapper to send GET requests to ``URL`` with optional ``params``.
+    This will return a ``Response`` object unless ``return_json=True`` in which case
+    a conversion is attempted.
+    """
+    #slow request rate
+    time.sleep(1)
+    # idk what these are but they were in the demo
+    headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+    }
+    #send request and recieve a response
+    resp = requests.request('GET', url, headers=headers, params=params)
+
+    # Gracefully handle errors
+    if resp.status_code != 200:
+
+        msg = f"Fuck \t Code:{resp.status_code} "
+
+        if resp.status_code == 400:
+            msg+= "\n" + resp.json()["message"]
+        
+        raise Exception(msg)
+
+    if return_json :
+        return resp.json()
+    
+    return resp
