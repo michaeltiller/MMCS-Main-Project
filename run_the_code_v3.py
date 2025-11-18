@@ -19,9 +19,10 @@ from folium import CircleMarker
 from folium.plugins import HeatMap
 from scipy.spatial.distance import pdist, squareform
 
+
 ######## Parameters 
 
-num_clusters = 400
+num_clusters = 800
 
 ######## 
 
@@ -62,6 +63,8 @@ locations_gdf["old Demand"] = desire_for_locs
 #####
 
 
+
+
 #### Get Distances #########
 
 
@@ -69,11 +72,35 @@ lat_lon = np.radians(locations_gdf[['lat', 'lon']].to_numpy())  # Convert to rad
 
 #dist = osrm_bike_matrix(locations_gdf[['lat', 'lon']].to_numpy())
 dist = squareform(pdist(lat_lon, metric=haversine))
+
+
 dist = dist * 1000
 
 dist_mat = dist
 
-def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, rev_per_bike,dist_min =100, dist_min_center = 100, dist_max=5_000, city_centre_radius= 1000):
+
+###### get train stations ######
+
+trainstations = pd.read_csv('trainstations.csv')
+
+trainstations = np.radians(trainstations[['Latitude', 'Longitude']].to_numpy())  # Convert to radians
+
+dist_to_trains = np.zeros((trainstations.shape[0], lat_lon.shape[0]))
+
+for i in range(trainstations.shape[0]):
+    for j in range(lat_lon.shape[0]):
+        dist_to_trains[i, j] = haversine(trainstations[i], lat_lon[j])
+ 
+dist_to_trains = dist_to_trains * 1000
+
+#dist_to_trains = dist_to_trains[np.any(dist_to_trains < 200, axis=1)]
+
+
+
+
+
+def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, budget, dist_to_trains, rev_per_bike,dist_min =100, dist_min_center = 100,
+                           total_bikes_max = 800, dist_max=5_000, city_centre_radius= 1000, dist_to_train_station = 200):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
@@ -95,15 +122,16 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
         , dtype=xp.npvar
     )
     
-
-    
-   
     ########### objective function #############
  
+    # prob.setObjective(
+    #     xp.Sum( (rev_per_bike * desire[i] - cost_bike) * bikes[i] for i in I ) - xp.Sum(cost_station * build[i] for i in I ) 
+    #     , sense = xp.maximize
+    # )
+    
     prob.setObjective(
-        xp.Sum( (rev_per_bike * desire[i] - cost_bike) * bikes[i] for i in I ) - xp.Sum(cost_station * build[i] for i in I ) 
-        , sense = xp.maximize
-    )
+        xp.Sum( desire[i] * bikes[i] for i in I )  
+        , sense = xp.maximize )
     ########### constraints #############
 
     # we can place at most bikes_max bikes in each location
@@ -122,7 +150,9 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
     prob.addConstraint(
         bikes[i] <= desire[i] + 1 for i in I
     )
-
+    prob.addConstraint(
+        xp.Sum(bikes[i] for i in I) <= total_bikes_max
+    )
         
     # stay within budget
     prob.addConstraint(
@@ -170,7 +200,14 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
         build[i] + xp.Sum(too_close_outside[i,j]*build[j] for j in I if j != i) <= 1
         for i in I
     )
-
+    
+    
+    
+    ### train station 
+    # for i in range(dist_to_trains.shape[0]):
+    #     prob.addConstraint(
+    #         xp.Sum(build[j] for j in I if dist_to_trains[i, j] <= dist_to_train_station) >= 1
+    #     )
     
  
     ########## Solving ###########
@@ -205,11 +242,13 @@ def create_and_solve_model(desire, dist_mat, bike_max, cost_bike, cost_station, 
 #demand = locations_gdf['prediced_Start_Trip_Counts'] + locations_gdf['prediced_end_Trip_Counts'] 
 demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.5 + locations_gdf['old Demand'] * 0.5
 
+demand = demand/365
+
 
 sol, mip = create_and_solve_model(
-    desire=demand, dist_mat=dist, bike_max=50,
+    desire=demand, dist_mat=dist, bike_max=30,dist_to_trains = dist_to_trains,
     cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,dist_min_center = 500, 
-    dist_min = 1000, dist_max =1500, city_centre_radius = 2000)
+    dist_min = 700, dist_max =1500, city_centre_radius = 2000, dist_to_train_station=300)
 
 
 finallocs = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
