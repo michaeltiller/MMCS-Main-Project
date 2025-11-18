@@ -29,11 +29,13 @@ def create_colours_for_locs_and_assignments(locs,assignments, cmap_name = "cool"
 
     Locations with no points assigned are coloured in gray
     """
+    #find the locations that have been assigned to
     locs_ass, assignments = np.unique(assignments, return_inverse=True)
     
+    # get the indices of those locations in locs
     locs_to_ind = dict( (l, i) for i, l in enumerate(locs))
     ind_locs_ass = np.array([ locs_to_ind[l] for l in locs ])
-    print(f"{ind_locs_ass=}")
+
     # will need to do something here when number of locs is large
     # the colours will differ by increasingly smpall degrees
     # an alternative is to limit the size of the cmap to say 20 and shuffle the indexes before being passed
@@ -43,12 +45,10 @@ def create_colours_for_locs_and_assignments(locs,assignments, cmap_name = "cool"
 
 
     cols_for_locs = np.zeros((len(locs),4))
-    print(f"{cols_for_locs.shape=}")
-    # locations with no demand/desire are shown in grey
+    # locations with no assignments are shown in grey
     cols_for_locs[:,:] = .5
 
     cols_for_locs[ind_locs_ass,:] = cols_locs_ass
-
     cols_for_points = cols_for_locs[assignments]
 
     return cols_for_locs, cols_for_points
