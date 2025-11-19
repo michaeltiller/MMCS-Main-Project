@@ -306,7 +306,7 @@ def get_dists_gps(df, memory_intense = False ):
         ).to_numpy()
     
     else:
-        d = np.zeros( (df.shape[0], df.shape[0]) )
+        d = np.zeros( (df.shape[0], df.shape[0]), dtype=np.float16 )
         for i, (lon, lat) in enumerate(zip(df["lon"], df["lat"])):
             d[i,] =  haversine_np(lon, lat, df["lon"], df["lat"])
         result = d
