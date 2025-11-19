@@ -314,6 +314,8 @@ def get_dists_gps(df, memory_intense = False ):
     e= perf_counter()
     print(f"getting gps dists took {e-s:.0f} secs")
 
+    return result
+
 
 def read_data_from_api():
     """
