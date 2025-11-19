@@ -293,13 +293,15 @@ def get_dists_gps(df, memory_intense = False ):
 
     The option ``memory_intense`` may or may not be more time-efficient but seems to max out my 8GB of RAM.
     """
+    print("getting gps dists")
+    s = perf_counter()
     if memory_intense:
         lon_lat= df[["lon","lat"]]
 
         def wrapper(tup, **kwargs):
             return haversine_np(*tup, **kwargs )
 
-        return lon_lat.apply(
+        result =  lon_lat.apply(
             func = wrapper, lat2 =df["lat"].values, lon2 = df["lon"].values, axis = 1
         ).to_numpy()
     
@@ -307,7 +309,10 @@ def get_dists_gps(df, memory_intense = False ):
         d = np.zeros( (df.shape[0], df.shape[0]) )
         for i, (lon, lat) in enumerate(zip(df["lon"], df["lat"])):
             d[i,] =  haversine_np(lon, lat, df["lon"], df["lat"])
-        return d
+        result = d
+    
+    e= perf_counter()
+    print(f"getting gps dists took {e-s:.0f} secs")
 
 
 def read_data_from_api():
