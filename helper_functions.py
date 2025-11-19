@@ -1,7 +1,8 @@
 import os, datetime
 import numpy as np
 import matplotlib.pyplot as plt
-import time, requests
+import time, requests, ujson
+
 def path( *args, **kwargs):
      """returns an OS independent path out of its arguments"""
      return os.path.join(*args, **kwargs)
@@ -81,6 +82,7 @@ def send_request(url, params=None, return_json=True):
         raise Exception(msg)
 
     if return_json :
-        return resp.json()
+        # apparently the ujson module is faster than the vanilla
+        return ujson.loads(resp.content)
     
     return resp
