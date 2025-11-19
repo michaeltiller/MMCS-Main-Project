@@ -102,7 +102,7 @@ pois["longitude"] = pois["lon"]
 
 
 rng = np.random.default_rng(2025)
-subset = rng.choice(pois.shape[0], size = 1_000)
+subset = rng.choice(pois.shape[0], size = 2_000)
 pois = pois.iloc[subset].reset_index(drop=True)
 print(f"{pois.shape=}")
 
@@ -125,23 +125,23 @@ sol, mip, near = IP_models.create_and_solve_extended_model(
 
 
 # Plot the solution
-built = sol["build"].to_numpy() == 1
-print(sol[built])
-_, ax1 = plt.subplots()
+# built = sol["build"].to_numpy() == 1
+# print(sol[built])
+# _, ax1 = plt.subplots()
 
 
-pois[~built].plot(
-    ax=ax1, label="Unused Locations",
-    markersize=30,
-    marker = "x"
-)
+# pois[~built].plot(
+#     ax=ax1, label="Unused Locations",
+#     markersize=30,
+#     marker = "x"
+# )
 
-pois[built].plot(
-    ax=ax1, label="Station Locations",
-    markersize=40,
-    marker = "^"
-)
+# pois[built].plot(
+#     ax=ax1, label="Station Locations",
+#     markersize=40,
+#     marker = "^"
+# )
 
-ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
-ax1.legend()
-plt.show()
+# ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
+# ax1.legend()
+# plt.show()

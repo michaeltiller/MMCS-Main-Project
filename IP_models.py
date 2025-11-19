@@ -144,17 +144,11 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
     prob.addConstraint(
         build[i] <= bikes[i] for i in I
     )
-    
-    # we will not put more bikes in a location than there is desire for bikes
-    # the plus one is to avoid issues with combining the above constraint and the connectedness constraint
-    # prob.addConstraint(
-    #     bikes[i] <= desire[i] + 1 for i in I
-    # )
 
     # Every station must have at least one near it
     near = dist_mat <= dist_max
     prob.addConstraint(
-        build[i] <= xp.Sum( near[i,j]*build[j] for j in I if j != i)
+        build[i] <= xp.Sum( build[j] for j in I if j != i and near[i,j])
         for i in I
     )
 
@@ -170,7 +164,7 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
         too_close[i] = new
 
     prob.addConstraint(
-        build[i] + xp.Sum( too_close[i,j]*build[j] for j in I if j !=i ) <= 1
+        build[i] + xp.Sum( build[j] for j in I if j !=i and too_close[i,j]) <= 1
         for i in I
     )
 
