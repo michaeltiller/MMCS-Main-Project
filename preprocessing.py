@@ -266,7 +266,7 @@ def distribute_regional_demand_by_L_score(regions, locations):
 
 def haversine_np(lon1, lat1, lon2, lat2):
     """
-    Calculate the great circle distance between two points
+    Calculate the great circle distance, in km, between two points
     on the earth (specified in decimal degrees)
     
     All args must be of equal length. 
@@ -426,7 +426,7 @@ def predict_bike_count_MLP( new_x, show_plot=False):
         ax1.scatter(lat, y_pred, color="red")
         ax2.scatter(lon, y_pred, color="red")
 
-        plt.title(title)
+        plt.title(title + " training predictions")
         plt.show()
 
     mlp_mod = MLPRegressor(hidden_layer_sizes=(75, 50), solver='lbfgs',
