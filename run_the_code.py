@@ -102,7 +102,7 @@ pois["longitude"] = pois["lon"]
 
 
 rng = np.random.default_rng(2025)
-subset = rng.choice(pois.shape[0], size = 2_000)
+subset = rng.choice(pois.shape[0], size = 1_000)
 pois = pois.iloc[subset].reset_index(drop=True)
 print(f"{pois.shape=}")
 
@@ -113,35 +113,37 @@ dists_locs = get_dists_gps(pois)
 demand = predict_bike_count_MLP(pois[["latitude", "longitude"]].to_numpy())
 
 
-sol, mip, near = IP_models.create_and_solve_extended_model(
+sol, mip = IP_models.create_and_solve_extended_model(
     desire = demand,
     dist_mat= dists_locs,
+    dist_max=1,
     near_centre=near_castle,
-    bikes_total=800, bikes_max = 50,
-    cost_bike=600, cost_station=20_000,
+    bikes_total=800, bikes_max = 25,
+    cost_bike=800, cost_station=2_000,
     budget=2_000_000
+    ,dist_min_in_centre=.2, dist_min_outside_centre=0
 )
 
 
 
-# Plot the solution
-# built = sol["build"].to_numpy() == 1
-# print(sol[built])
-# _, ax1 = plt.subplots()
+#### Plot the solution
+built = sol["build"].to_numpy() == 1
+print(sol[built])
+_, ax1 = plt.subplots()
 
 
-# pois[~built].plot(
-#     ax=ax1, label="Unused Locations",
-#     markersize=30,
-#     marker = "x"
-# )
+pois[~built].plot(
+    ax=ax1, label="Unused Locations",
+    markersize=30,
+    marker = "x"
+)
 
-# pois[built].plot(
-#     ax=ax1, label="Station Locations",
-#     markersize=40,
-#     marker = "^"
-# )
+pois[built].plot(
+    ax=ax1, label="Station Locations",
+    markersize=40,
+    marker = "^"
+)
 
-# ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
-# ax1.legend()
-# plt.show()
+ctx.add_basemap(ax1, source=ctx.providers.CartoDB.Positron)
+ax1.legend()
+plt.show()

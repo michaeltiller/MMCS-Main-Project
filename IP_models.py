@@ -102,7 +102,7 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
     print("setting up in IP")
     s= perf_counter()
     # stop the big stream of text
-    xp.setOutputEnabled(False)
+    # xp.setOutputEnabled(False)
     prob = xp.problem("First_bike_extension") 
 
     num_locs = desire.shape[0]
@@ -176,8 +176,14 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
     ########## Solving ###########
     # Write problem statement to file, for debugging
     # prob.write("problem","ips")
+    del too_close, near, dist_mat, near_centre
     e = perf_counter()
     print(f"set-up in IP took {e-s:.0f} seconds")
+
+    # attr = prob.attributes.__dict__
+    # for key in attr:
+    #     if "memory" in key:
+    #         print(f"{key} {attr[key]}")
 
     print("Solving")
     solve_start = perf_counter()
@@ -189,6 +195,11 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
     MIP_gap= get_MIP_gap(prob)
     print(f"{MIP_gap=:.2%}")
 
+    # attr = prob.attributes.__dict__
+    # for key in attr:
+    #     if "memory" in key:
+    #         print(f"{key} {attr[key]}")
+
     # look at the solution
     solution  = pd.DataFrame({
         "build": np.array([ int(i) for i in prob.getSolution(build) ]),
@@ -196,8 +207,10 @@ def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, co
         "desire": desire
     })
 
+
+
     # return the pertient info that was not inputted
-    return solution, MIP_gap, near
+    return solution, MIP_gap
 
 
 
