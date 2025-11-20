@@ -90,7 +90,7 @@ DIST_MAX = 2_000
 
 
 
-#### Extended model (or whatever we want to call it)
+############## Basic model with dist min constraints
 pois = pd.read_csv("edinburgh_pois.csv")
 pois = gpd.GeoDataFrame(
     pois,
@@ -113,7 +113,7 @@ dists_locs = get_dists_gps(pois)
 demand = predict_bike_count_MLP(pois[["latitude", "longitude"]].to_numpy())
 
 
-sol, mip = IP_models.create_and_solve_extended_model(
+sol, mip = IP_models.create_and_solve_basic_distmin_model(
     desire = demand,
     dist_mat= dists_locs,
     dist_max=1,

@@ -95,7 +95,7 @@ def create_and_solve_first_model(desire, dist_mat, bike_max, cost_bike, cost_sta
 
 
 
-def create_and_solve_extended_model(desire, dist_mat, near_centre, cost_bike, cost_station, budget,
+def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bike, cost_station, budget,
                                      dist_max=5, dist_min_in_centre = .250, dist_min_outside_centre =.750,
                                       bikes_max = 50, bikes_total = 800 ):
 
