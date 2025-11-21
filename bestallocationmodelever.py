@@ -23,7 +23,7 @@ import itertools
 
 ######## Parameters 
 
-num_clusters = 400
+num_clusters = 100
 
 ######## 
 
@@ -80,40 +80,27 @@ for t in range(num_trains):
         train_lon[t], train_lat[t],
         loc_lon, loc_lat
         )
-    near_to_trains = near_to_trains < 1
+    near_to_trains = near_to_trains < .4 #400 metres
     print(f"Locs near train station {t} is {near_to_trains[t].sum()}")
 
 
 
 
 
-demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.5 + locations_gdf['old Demand'] * 0.5
+demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old Demand'] * 0.25 + predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())* .5
+
 
 demand = demand/365
 
 
 sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
-    desire=demand, dist_mat=dist_mat, bike_max=50,
+    desire=demand, dist_mat=dist_mat, bike_max=35,
     cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
     near_to_trains=near_to_trains,
     dist_min = 0.4, dist_max =2)
 
 
-# desire=demand 
-# dist_mat=dist 
-# bike_max=50 
- 
-# cost_bike=580 
-# cost_station=20_000 
-# budget=2_000_000 
-# rev_per_bike = 1000 
-# dist_min = 700
-# dist_max =6000
-
-finallocs = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
-
-
-df = finallocs
+df = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
 
 m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
 
@@ -177,8 +164,20 @@ for lat, lon in zip( train_lat, train_lon ):
 # Optional: add heatmap for demand
 # heat_data = df[['lat', 'lon', 'desire']].values.tolist()
 # HeatMap(heat_data, radius=20, blur=15, max_zoom=13).add_to(m)
-m.show_in_browser()
-m.save('bike_stations.html')
+
+
+stamp = timestamp()
+save_folder = path("good_example_data", stamp)
+
+os.mkdir(save_folder)
+os.chdir(save_folder)
+
+m.save("the_map.html")
+sol.to_csv("the_sol.csv")
+pd.DataFrame({
+    "demand":demand
+}).to_csv("demand.csv")
+
 
 
 
