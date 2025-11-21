@@ -218,8 +218,8 @@ def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bik
 
 def create_and_solve_extended_model(desire, dist_mat, bike_max, 
                                     cost_bike, cost_station, budget,
-                                    rev_per_bike, near_to_trains,  trainstationbenefits, 
-                                    dist_min =100, dist_max=5_000, bikes_total = 800):
+                                    near_trains,  trainstationbenefits, 
+                                    dist_min =0, dist_max=5, bikes_total = 800):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
@@ -227,7 +227,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
     num_locs = desire.shape[0]
     I = set(range(num_locs))
-    Trains = range(near_to_trains.shape[0])
+    Trains = range(near_trains.shape[0])
 
     ########### Decision variables #############
 
@@ -267,7 +267,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     ########### Soft train-station coverage #############
     # we can cover a train station by building near it
     for t in Trains:
-        nearby_locs = np.where(near_to_trains[t])[0]
+        nearby_locs = np.where(near_trains[t])[0]
         if nearby_locs.size > 0:
             prob.addConstraint(train_covered[t] <= xp.Sum(build[i] for i in nearby_locs))
         else:

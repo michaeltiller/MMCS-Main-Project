@@ -77,17 +77,25 @@ for t in range(num_trains):
     print(f"Locs near {train_stations["Station"].iloc[t]} is {near_to_trains[t].sum()}")
 
 
-
-
-trainstationnames = ['Edinburgh Waverley','Haymarket', 'Slateford', 'Wester Hailes', 'South Gyle', 'Curriehill', 'Brunstane', 'Newcraighall','Gateway ', 'Edinburgh business park ']
-trainstationbenefits = [80, 60, 40, 40, 30, 40, 40, 30, 40, 50 ]
-
+################## Change Parameters here
 
 sol, mip, alloc_df,  = IP_models.create_and_solve_extended_model(
-    desire=demand, dist_mat=dist_mat,trainstationbenefits = trainstationbenefits,  bike_max=30, 
-    cost_bike=1000, cost_station=5000, budget=1_000_000, rev_per_bike = 1000,
-    near_to_trains=near_to_trains,
-    dist_min = 0.4, dist_max =2)
+    desire=demand, dist_mat=dist_mat,
+#    Edinburgh Waverley, Haymarket, Slateford, Wester Hailes, South Gyle,
+#    Curriehill, Brunstane, Newcraighall, Gateway,Edinburgh business park
+    trainstationbenefits = [80, 60, 40, 40, 30,
+                             40, 40, 30, 40, 50 ],
+    bike_max=30, # estimated from average of historical stations
+    cost_bike=1000, 
+    cost_station=5000, 
+    budget=1_000_000, 
+    near_trains=near_to_trains,
+    dist_min = 0.4, #stations no closer than 400m
+    dist_max =2  #stations no more than 2km apart
+)
+
+
+############## Plotting and saving output
 
 df = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
 
@@ -149,11 +157,12 @@ for _, station in train_stations.iterrows():
 
 stamp = timestamp()
 save_folder = path("gen_data", stamp)
-
 os.mkdir(save_folder)
 
 m.save(path(save_folder,"the_map.html") )
+
 sol.to_csv(path(save_folder, "the_sol.csv"))
+
 pd.DataFrame({
     "demand":demand
 }).to_csv(path(save_folder,"demand.csv") )
