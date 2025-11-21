@@ -297,9 +297,9 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         bikes[i] <= desire[i] + 1 for i in I
     )
 
-    # we have a total of 800 bikes
+    # we have a total number of bikes ~800
     prob.addConstraint(
-        xp.Sum( bikes[i] for i in I) <= 800
+        xp.Sum( bikes[i] for i in I) <= bikes_total
     )
 
         
@@ -319,7 +319,11 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
                     too_close[j,i] = 1
 
     
-    prob.addConstraint(build[i] + xp.Sum(too_close[i,j]*build[j] for j in I if j != i) <= 1 for i in I)
+    prob.addConstraint(
+        build[i] + xp.Sum(build[j] for j in I if j != i and too_close[i,j]) 
+        <= 1
+        for i in I
+        )
 
 
     ## connectivity Constraints ####
@@ -373,6 +377,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         j = np.where(temp[i])[0]
         if j.any():
             arcs.append((i,j[0].item()))
+    
     # find the cycles in the allocations
     G = nx.DiGraph(arcs)
     cycles = list(nx.simple_cycles(G))
@@ -420,7 +425,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     # look at the solution
     solution  = pd.DataFrame({
         "build": np.array([ int(i) for i in prob.getSolution(build) ]),
-        "bikes": np.array([int(i) for i in prob.getSolution(bikes) ]),
+        "bikes": np.array([ int(i) for i in prob.getSolution(bikes) ]),
         "desire": desire
     })
     

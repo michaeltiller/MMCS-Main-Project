@@ -10,7 +10,7 @@ from folium.plugins import HeatMap
 
 ######## Parameters 
 
-num_clusters = 100
+num_clusters = 400
 
 ######## 
 
@@ -63,7 +63,6 @@ dist_mat = get_dists_gps(locations_gdf)
 
 train_stations = pd.read_csv('trainstations.csv')
 num_trains = train_stations.shape[0]
-print(train_stations.columns)
 
 near_to_trains = np.zeros((num_trains, num_clusters), dtype = bool)
 
