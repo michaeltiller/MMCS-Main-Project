@@ -397,20 +397,20 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         print("adding connectedness constraints")
         # s_connect=perf_counter()
 
-        for s in cycles:
-            print(f"{s=}")
-            outside_s = I.difference(set(s))
-            prob.addConstraint(
-                xp.Sum(allocated[i, j] for i in outside_s for j in s)
-                <=
-                xp.Sum( build[i] for i in s) / size_s
-            )    
+        # for s in cycles:
+        #     print(f"{s=}")
+        #     outside_s = I.difference(set(s))
+        #     prob.addConstraint(
+        #         xp.Sum(allocated[i, j] for i in outside_s for j in s)
+        #         <=
+        #         xp.Sum( build[i] for i in s) / size_s
+        #     )    
 
-        # prob.addConstraint(
-        #     xp.Sum(allocated[i,j] for i in s for j in s )
-        #     <= xp.Sum(build[i] for i in s) - xp.Sum(build[i] for i in s)/size_s
-        #     for s in cycles
-        # )
+        prob.addConstraint(
+            xp.Sum(allocated[i,j] for i in s for j in s )
+            <= xp.Sum(build[i] for i in s) - xp.Sum(build[i] for i in s)/size_s
+            for s in cycles
+        )
 
         prob.write(f"problem)it{count}","lp")
         print("Resolving")
