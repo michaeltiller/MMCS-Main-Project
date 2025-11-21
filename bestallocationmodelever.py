@@ -1,29 +1,16 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Nov 20 14:18:12 2025
-
-@author: michael
-"""
-
-
 import numpy as np
 from helper_functions import *
 import IP_models
 from preprocessing import *
 from demandfuncs import *
 import pandas as pd 
-import glob
-import xpress as xp
 import folium
 from folium import CircleMarker
 from folium.plugins import HeatMap
-from scipy.spatial.distance import pdist, squareform
-import itertools
 
 ######## Parameters 
 
-num_clusters = 400
+num_clusters = 100
 
 ######## 
 
@@ -64,6 +51,11 @@ desire_for_locs[locs_with_demand] = counts
 
 locations_gdf["old Demand"] = desire_for_locs
 
+traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())
+
+demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old Demand'] * 0.25 + traffic_based_demand* .5
+demand = demand/365
+
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
 
@@ -71,6 +63,7 @@ dist_mat = get_dists_gps(locations_gdf)
 
 train_stations = pd.read_csv('trainstations.csv')
 num_trains = train_stations.shape[0]
+print(train_stations.columns)
 
 near_to_trains = np.zeros((num_trains, num_clusters), dtype = bool)
 
@@ -81,25 +74,16 @@ for t in range(num_trains):
         loc_lon, loc_lat
         )
     near_to_trains = near_to_trains < .4 #400 metres
-    print(f"Locs near train station {t} is {near_to_trains[t].sum()}")
+    print(f"Locs near {train_stations["Station"].iloc[t]} is {near_to_trains[t].sum()}")
 
 
 
 
-
-demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old Demand'] * 0.25 + predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())* .5
-
-
-demand = demand/365
 trainstationnames = ['Edinburgh Waverley','Haymarket', 'Slateford', 'Wester Hailes', 'South Gyle', 'Curriehill', 'Brunstane', 'Newcraighall','Gateway ', 'Edinburgh business park ']
 trainstationbenefits = [80, 60, 40, 40, 30, 40, 40, 30, 40, 50 ]
 
-# sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
-#     desire=demand, dist_mat=dist_mat, bike_max=35,
-#     cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
-#     near_to_trains=near_to_trains,
-#     dist_min = 0.4, dist_max =2)
-sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
+
+sol, mip, alloc_df,  = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat,trainstationbenefits = trainstationbenefits,  bike_max=30, 
     cost_bike=1000, cost_station=5000, budget=1_000_000, rev_per_bike = 1000,
     near_to_trains=near_to_trains,
@@ -152,38 +136,29 @@ for i in range(len(df)):
             
             
 
-
-# for lat, lon in zip( np.degrees(train_lat), np.degrees(train_lon) ):
-#     folium.Marker(
-#         location=[lat, lon],
-#         icon=folium.Icon(color='blue', icon='train', prefix='fa'),
-#         popup=f"<b>Train Station</b><br>Lat: {lat}<br>Lon: {lon}"
-#     ).add_to(m)
-
-for lat, lon in zip( train_lat, train_lon ):
+for _, station in train_stations.iterrows():
+    lat = station["Latitude"]
+    lon = station["Longitude"]
     folium.Marker(
-        location=[lat, lon],
+        location= [lat, lon],
         icon=folium.Icon(color='blue', icon='train', prefix='fa'),
-        popup=f"<b>Train Station</b><br>Lat: {lat}<br>Lon: {lon}"
+        popup=f"<b>Train Station</b><br>{station["Station"]}<br>Lat: {lat}<br>Lon: {lon}"
     ).add_to(m)
-# Optional: add heatmap for demand
-# heat_data = df[['lat', 'lon', 'desire']].values.tolist()
-# HeatMap(heat_data, radius=20, blur=15, max_zoom=13).add_to(m)
 
-m.show_in_browser()
+
 
 stamp = timestamp()
-save_folder = path("good_example_data", stamp)
+save_folder = path("gen_data", stamp)
 
 os.mkdir(save_folder)
-os.chdir(save_folder)
 
-m.save("the_map.html")
-sol.to_csv("the_sol.csv")
+m.save(path(save_folder,"the_map.html") )
+sol.to_csv(path(save_folder, "the_sol.csv"))
 pd.DataFrame({
     "demand":demand
-}).to_csv("demand.csv")
+}).to_csv(path(save_folder,"demand.csv") )
 
+m.show_in_browser()
 
 
 

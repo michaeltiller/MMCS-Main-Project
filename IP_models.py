@@ -258,7 +258,8 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
     ########### Objective function #############
     prob.setObjective(
-        xp.Sum(desire[i] * bikes[i] for i in I) +  xp.Sum(train_covered[t] * trainstationbenefits[t] for t in Trains),
+        xp.Sum(desire[i] * bikes[i] for i in I) 
+        +  xp.Sum(train_covered[t] * trainstationbenefits[t] for t in Trains),
         sense=xp.maximize
     )
 
@@ -275,11 +276,6 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
     
     
-    # if u want it to run fast use the below objective function 
-    # prob.setObjective(
-    #     xp.Sum( (rev_per_bike * desire[i] - cost_bike) * bikes[i] for i in I ) - xp.Sum(cost_station * build[i] for i in I ) 
-    #     , sense = xp.maximize
-    # )
     ########### constraints #############
 
     # we can place at most bikes_max bikes in each location
@@ -337,11 +333,6 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         for j in I 
     )
     
-    # this is what fucked it - having the the below constraint prevents the spoke style connections 
-    # prob.addConstraint(
-    #     build[j] == xp.Sum(allocated[i,j] for i in I) 
-    #     for j in I 
-    # )
     prob.addConstraint(
         allocated[i, j] + allocated[j, i] <= 1 for i in I for j in I
     )
@@ -356,13 +347,10 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         for j in I 
     )
     
-  
-    
-    
  
     ########## Solving ###########
     # Write problem statement to file, for debugging
-    prob.write("problem","lp")
+    # prob.write("problem","lp")
  
     print("Solving first without connectedness")
     solve_start = perf_counter()
@@ -374,51 +362,38 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     MIP_gap= get_MIP_gap(prob)
     print(f"{MIP_gap=:.2%}")
 
-    
 
-    temp = prob.getSolution(allocated)
+
     # size of subsets where we do not want a loop
     size_s = 4
     ######### Cycling contraint ##########
+    temp = prob.getSolution(allocated)
     arcs = []
-
     for i in I:
-        row_i = temp[i]
-        j = np.where(row_i)[0]
+        j = np.where(temp[i])[0]
         if j.any():
             arcs.append((i,j[0].item()))
-    
-    
+    # find the cycles in the allocations
     G = nx.DiGraph(arcs)
     cycles = list(nx.simple_cycles(G))
     cycles = [ cycle for cycle in cycles if len(cycle) < size_s ]
+
+
     count=0
     while cycles:
 
-        print("adding connectedness constraints")
-        # s_connect=perf_counter()
-
-        # for s in cycles:
-        #     print(f"{s=}")
-        #     outside_s = I.difference(set(s))
-        #     prob.addConstraint(
-        #         xp.Sum(allocated[i, j] for i in outside_s for j in s)
-        #         <=
-        #         xp.Sum( build[i] for i in s) / size_s
-        #     )    
-
         prob.addConstraint(
             xp.Sum(allocated[i,j] for i in s for j in s )
-            <= xp.Sum(build[i] for i in s) - xp.Sum(build[i] for i in s)/size_s
+            <= 
+            xp.Sum(build[i] for i in s) - xp.Sum(build[i] for i in s)/size_s
             for s in cycles
         )
 
-        prob.write(f"problem)it{count}","lp")
-        print("Resolving")
+        print(f"Resolving due to {len(cycles)} cycles")
         solve_start = perf_counter()
         prob.solve()
         solve_end = perf_counter()
-        print(f"Solved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
+        print(f"Resolved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
     
         arcs = []
         temp = prob.getSolution(allocated)
@@ -432,13 +407,15 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         G = nx.DiGraph(arcs)
         cycles = list(nx.simple_cycles(G))
         cycles = [ cycle for cycle in cycles if len(cycle) < size_s ]
-        print(cycles)
+
         count+=1
-        if count == 50: break
+        if count == 50: 
+            print(f"Stopped enforcing connectedness after {count} iterations")    
+            break
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
-    print(f"{MIP_gap=:.2%}")
+    print(f"final {MIP_gap=:.2%}")
 
     # look at the solution
     solution  = pd.DataFrame({
@@ -465,7 +442,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
    
     
     # return the pertient info that was not inputted
-    return solution, MIP_gap, alloc_df, arcs
+    return solution, MIP_gap, alloc_df
 
 
 
