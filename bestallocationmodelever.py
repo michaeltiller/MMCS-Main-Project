@@ -6,20 +6,6 @@ Created on Thu Nov 20 14:18:12 2025
 @author: michael
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 15 19:49:10 2025
-
-@author: micha
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov 11 19:18:32 2025
-
-@author: michael
-"""
 
 import numpy as np
 from helper_functions import *
@@ -37,7 +23,7 @@ import itertools
 
 ######## Parameters 
 
-num_clusters = 200
+num_clusters = 400
 
 ######## 
 
@@ -110,7 +96,7 @@ sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat, bike_max=50,
     cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
     near_to_trains=near_to_trains,
-    dist_min = 0, dist_max =2)
+    dist_min = 0.4, dist_max =2)
 
 
 # desire=demand 
@@ -172,18 +158,25 @@ for i in range(len(df)):
             ).add_to(m)
             
             
+            
 
-for lat, lon in zip( np.degrees(train_lat), np.degrees(train_lon) ):
+
+# for lat, lon in zip( np.degrees(train_lat), np.degrees(train_lon) ):
+#     folium.Marker(
+#         location=[lat, lon],
+#         icon=folium.Icon(color='blue', icon='train', prefix='fa'),
+#         popup=f"<b>Train Station</b><br>Lat: {lat}<br>Lon: {lon}"
+#     ).add_to(m)
+
+for lat, lon in zip( train_lat, train_lon ):
     folium.Marker(
         location=[lat, lon],
         icon=folium.Icon(color='blue', icon='train', prefix='fa'),
         popup=f"<b>Train Station</b><br>Lat: {lat}<br>Lon: {lon}"
     ).add_to(m)
-
-
 # Optional: add heatmap for demand
-heat_data = df[['lat', 'lon', 'desire']].values.tolist()
-HeatMap(heat_data, radius=20, blur=15, max_zoom=13).add_to(m)
+# heat_data = df[['lat', 'lon', 'desire']].values.tolist()
+# HeatMap(heat_data, radius=20, blur=15, max_zoom=13).add_to(m)
 m.show_in_browser()
 m.save('bike_stations.html')
 
