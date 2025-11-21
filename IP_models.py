@@ -6,6 +6,7 @@ from time import perf_counter
 from helper_functions import *
 import platform
 from itertools import combinations
+import networkx as nx
 
 if platform.system() == "Windows":
     xp.init('C:/xpressmp//bin/xpauth.xpr')
@@ -360,7 +361,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
  
     ########## Solving ###########
     # Write problem statement to file, for debugging
-    # prob.write("problem","ips")
+    prob.write("problem","lp")
  
     print("Solving first without connectedness")
     solve_start = perf_counter()
@@ -375,7 +376,8 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     
 
     temp = prob.getSolution(allocated)
-
+    # size of subsets where we do not want a loop
+    size_s = 4
     ######### Cycling contraint ##########
     arcs = []
 
@@ -385,75 +387,53 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         if j.any():
             arcs.append((i,j[0].item()))
     
-    # size of subsets where we do not want a loop
-    size_s = 3
     
+    G = nx.DiGraph(arcs)
+    cycles = list(nx.simple_cycles(G))
+    cycles = [ cycle for cycle in cycles if len(cycle) < size_s ]
+    count=0
+    while cycles:
+
+        print("adding connectedness constraints")
+        # s_connect=perf_counter()
+
+        for s in cycles:
+            print(f"{s=}")
+            outside_s = I.difference(set(s))
+            prob.addConstraint(
+                xp.Sum(allocated[i, j] for i in outside_s for j in s)
+                <=
+                xp.Sum( build[i] for i in s) / size_s
+            )    
+
+        # prob.addConstraint(
+        #     xp.Sum(allocated[i,j] for i in s for j in s )
+        #     <= xp.Sum(build[i] for i in s) - xp.Sum(build[i] for i in s)/size_s
+        #     for s in cycles
+        # )
+
+        prob.write(f"problem)it{count}","lp")
+        print("Resolving")
+        solve_start = perf_counter()
+        prob.solve()
+        solve_end = perf_counter()
+        print(f"Solved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
     
-   
-    print("adding connectedness constraints")
-    s_connect=perf_counter()
-    #I suspect that in the second solution we build in areas we hadn't before 
-    # - areas not subject to the below constraints
-    # hence we see cycles
-
-    originally_built = prob.getSolution(build).nonzero()[0]
-    print(f" {len(originally_built)=:,} ")
-
-    all_built_subsets = combinations(originally_built , size_s)
-    
-    # each village must have an arc inwards from outside the village
-    # count = 0
-    for s in all_built_subsets:
-
-        outside_s = I.difference(set(s))
-        prob.addConstraint(
-            xp.Sum(allocated[i, j] for i in outside_s for j in s)
-            <=
-            xp.Sum( build[i] for i in s) / size_s
-        )    
-    #     count +=1
-
-    # map(
-    #     lambda s : prob.addConstraint(
-    #         xp.Sum(allocated[i, j] for i in I.difference(set(s)) for j in s)
-    #         <=
-    #         xp.Sum( build[i] for i in s) / size_s
-    #     )
-    #     , all_built_subsets
-    # )
-
-    
-    # no loops in a village / subset s
-    prob.addConstraint(
-        xp.Sum(allocated[i,j] for i in s for j in s )
-        <= size_s - 1
-        for s in all_built_subsets
-    )
-    e_connect = perf_counter()
-    print(f"done adding connectedness {e_connect-s_connect:.0f} secs")
-    # for s in all_subsets:
+        arcs = []
+        temp = prob.getSolution(allocated)
+        for i in I:
+            row_i = temp[i]
+            j = np.where(row_i)[0]
+            if j.any():
+                arcs.append((i,j[0].item()))
         
-    #     s = all_subsets[0]
-    #     notinS = [el for el in G.nodes() if el not in s]
-    #     prob.addConstraint(
-    #         xp.Sum(allocated[i, j] for i in notinS for j in s)
-    #         <=
-    #         xp.Sum( build[i] for i in s) / size_s
-    #     )
         
-    #     # no loops in a village
-    #     prob.addConstraint(
-    #         xp.Sum(allocated[i,j] for i in s for j in s )
-    #         <= size_s - 1
-    #     )
-    
-    
-
-    print("Resolving")
-    solve_start = perf_counter()
-    prob.solve()
-    solve_end = perf_counter()
-    print(f"Solved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
+        G = nx.DiGraph(arcs)
+        cycles = list(nx.simple_cycles(G))
+        cycles = [ cycle for cycle in cycles if len(cycle) < size_s ]
+        print(cycles)
+        count+=1
+        if count ==4: break
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
