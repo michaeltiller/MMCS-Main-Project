@@ -299,6 +299,11 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         bikes[i] <= desire[i] + 1 for i in I
     )
 
+    # we have a total of 800 bikes
+    prob.addConstraint(
+        xp.Sum( bikes[i] for i in I) <= 800
+    )
+
         
     # stay within budget
     prob.addConstraint(
