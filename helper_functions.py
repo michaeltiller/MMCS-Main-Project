@@ -86,3 +86,23 @@ def send_request(url, params=None, return_json=True):
         return ujson.loads(resp.content)
     
     return resp
+
+
+def secs(t_secs):
+    """present ``t_secs`` time in (possible fractional) seconds in a more readable format"""
+    t_secs = int(t_secs)
+    t_mins, secs = divmod(t_secs, 60)
+    hours, mins = divmod(t_mins, 60)
+
+    out = ""
+    if secs:
+        out = f"{secs}secs "
+    if mins:
+        out = f"{mins}mins " + out
+    if hours:
+        out = f"{hours}hrs " + out
+
+    if out == "":
+        out = "0 secs"
+
+    return out
