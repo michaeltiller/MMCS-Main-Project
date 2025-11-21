@@ -468,6 +468,24 @@ def predict_bike_count_MLP( new_x, show_plot=False):
 
     return new_y_pred
 
+
+def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=False):
+    """Extract some basic stats from the solution"""
+    out = dict()
+    out["bikes_used"] = solu["bikes"].sum()
+    out["stations_built"] = solu["build"].sum()
+    out["trains_covered"] = train_solu["train_covered"].sum()
+
+    out["daily_demand_met"] = train_solu["train_benefit"][train_solu["train_covered"]].sum() + out["bikes_used"]
+
+    if pretty_print:
+        for key, value in out.items():
+            print(f"{key}:{value}")
+
+    return out
+
+
+
 if __name__ == "__main__":
 
     pois = pd.read_csv("edinburgh_pois.csv")

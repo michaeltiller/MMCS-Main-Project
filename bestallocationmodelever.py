@@ -77,11 +77,11 @@ for t in range(num_trains):
 
 ################## Change Parameters here
 
-sol, mip, alloc_df,  = IP_models.create_and_solve_extended_model(
+sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat,
 #    Edinburgh Waverley, Haymarket, Slateford, Wester Hailes, South Gyle,
 #    Curriehill, Brunstane, Newcraighall, Gateway,Edinburgh business park
-    trainstationbenefits = [80, 60, 40, 40, 30,
+    train_benefit = [80, 60, 40, 40, 30,
                              40, 40, 30, 40, 50 ],
     bike_max=30, # estimated from average of historical stations
     cost_bike=1000, 
@@ -92,6 +92,7 @@ sol, mip, alloc_df,  = IP_models.create_and_solve_extended_model(
     dist_max =2  #stations no more than 2km apart
 )
 
+x = summarise_solution(sol, train_sol, True)
 
 ############## Plotting and saving output
 
@@ -121,11 +122,11 @@ for i, row in df.iterrows():
         popup=folium.Popup(popup_text, max_width=250)
     ).add_to(m)
 
-alloc_mat = alloc_df.values
+# alloc_mat = alloc_sol.values
 
 for i in range(len(df)):
     for j in range(len(df)):
-        if alloc_mat[i, j] == 1:
+        if alloc_sol[i, j] == 1:
             # Coordinates of the two stations
             lat_i, lon_i = df.loc[i, ['lat', 'lon']]
             lat_j, lon_j = df.loc[j, ['lat', 'lon']]
@@ -153,7 +154,7 @@ for _, station in train_stations.iterrows():
 
 
 
-stamp = timestamp()
+stamp = timestamp() + f" {num_clusters=:,}"
 save_folder = path("gen_data", stamp)
 os.mkdir(save_folder)
 

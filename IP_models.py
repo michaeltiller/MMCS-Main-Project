@@ -218,15 +218,15 @@ def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bik
 
 def create_and_solve_extended_model(desire, dist_mat, bike_max, 
                                     cost_bike, cost_station, budget,
-                                    near_trains,  trainstationbenefits, 
+                                    near_trains,  train_benefit, 
                                     dist_min =0, dist_max=5, bikes_total = 800):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
-    prob = xp.problem("First_bike_extension") 
+    prob = xp.problem("Final extended model") 
 
-    num_locs = desire.shape[0]
-    I = set(range(num_locs))
+    # index sets
+    I = set(range(desire.shape[0]))
     Trains = range(near_trains.shape[0])
 
     ########### Decision variables #############
@@ -259,7 +259,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     ########### Objective function #############
     prob.setObjective(
         xp.Sum(desire[i] * bikes[i] for i in I) 
-        +  xp.Sum(train_covered[t] * trainstationbenefits[t] for t in Trains),
+        +  xp.Sum(train_benefit[t] * train_covered[t]  for t in Trains),
         sense=xp.maximize
     )
 
@@ -310,17 +310,8 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     
     # Basic min Distance constraints #####
     
-    too_close = np.zeros_like(dist_mat, dtype=int)
-    for i in I:
-        for j in I:
-            if i < j:
-                if dist_mat[i,j] < dist_min:
-                    too_close[i,j] = 1
-                    too_close[j,i] = 1
-
-    
     prob.addConstraint(
-        build[i] + xp.Sum(build[j] for j in I if j != i and too_close[i,j]) 
+        build[i] + xp.Sum(build[j] for j in I if j != i and dist_mat[i,j] < dist_min) 
         <= 1
         for i in I
         )
@@ -342,6 +333,12 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     )
     
     # Distance constraints
+    prob.addConstraint(
+        allocated[i,j] == 0 
+        for i in I for j in I
+        if dist_mat[i,j] > dist_max
+    )
+
     prob.addConstraint( 
         build[j] * dist_min <= xp.Sum(allocated[j, i] * dist_mat[i, j] for i in I)
         for j in I 
@@ -429,25 +426,24 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         "desire": desire
     })
     
-    alloc_solution = np.zeros_like(allocated, dtype=bool)
-    temp = prob.getSolution(allocated)
     
+    alloc_solution = prob.getSolution(allocated).astype(bool)
     
-    for i in I:
-        for j in I:
-            alloc_solution[i, j] = bool(temp[i, j])
-    del temp
+    # temp = prob.getSolution(allocated)
+    # old_alloc_solution = np.zeros_like(allocated, dtype=bool)
+    # for i in I:
+    #     for j in I:
+    #         old_alloc_solution[i, j] = bool(temp[i, j])
+    # assert (old_alloc_solution==alloc_solution).all()
 
-    # Put into a DataFrame for readability
-    alloc_df = pd.DataFrame(
-        alloc_solution,
-        columns=[f"to_{j}" for j in I],
-        index=[f"from_{i}" for i in I]
-    )
-   
+    
+    train_sol = pd.DataFrame({
+           "train_covered": np.array([ int(i) for i in prob.getSolution(train_covered) ]),
+           "train_benefit": train_benefit
+       })
     
     # return the pertient info that was not inputted
-    return solution, MIP_gap, alloc_df
+    return solution, MIP_gap, alloc_solution, train_sol
 
 
 
