@@ -410,7 +410,8 @@ def predict_bike_count_MLP( new_x, show_plot=False):
     Right now the prediction is not impressive but I think we have reached the point of diminishing returns.
     """
 
-    traffic = read_traffic_data()
+    # traffic = read_traffic_data()
+    traffic = pd.read_csv("edinburgh_traffic_data_2018-2024_no_2020-2021.csv")
 
     train_X = traffic[["latitude", "longitude"]].to_numpy()
     train_y =  traffic["pedal_cycles"].to_numpy()
@@ -419,7 +420,7 @@ def predict_bike_count_MLP( new_x, show_plot=False):
     scaler = StandardScaler()
     train_X = scaler.fit(train_X).transform(train_X)
 
-    print(f"Using {train_X.shape[0]:,} obs to predict {new_x.shape[0]} outcomes")
+    print(f"Using {train_X.shape[0]:,} observations to predict {new_x.shape[0]:,} outcomes")
 
 
     def plot_preds_against_gps( y_pred, title=""):
