@@ -46,14 +46,13 @@ near_labs = assign_points_to_nearest_location(hist_starts_gdf, locations_gdf)
 # Use the number of trips that started nearby as a proxy for "desire"/"demand"
 locs_with_demand, counts = np.unique(near_labs, return_counts = True)
 
-desire_for_locs = np.zeros(len(locations_gdf))
-desire_for_locs[locs_with_demand] = counts
+old_demand = np.zeros(len(locations_gdf))
+old_demand[locs_with_demand] = counts
 
-locations_gdf["old Demand"] = desire_for_locs
 
 traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())
 
-demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old Demand'] * 0.25 + traffic_based_demand* .5
+demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25 + traffic_based_demand* .5
 demand = demand/365
 
 #### Get Distances #########
