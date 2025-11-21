@@ -100,7 +100,7 @@ def create_and_solve_first_model(desire, dist_mat, bike_max, cost_bike, cost_sta
 def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bike, cost_station, budget,
                                      dist_max=5, dist_min_in_centre = .250, dist_min_outside_centre =.750,
                                       bikes_max = 50, bikes_total = 800 ):
-
+    
     print("setting up in IP")
     s= perf_counter()
     # stop the big stream of text
@@ -218,7 +218,7 @@ def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bik
 
 def create_and_solve_extended_model(desire, dist_mat, bike_max, 
                                     cost_bike, cost_station, budget,
-                                    rev_per_bike, near_to_trains,
+                                    rev_per_bike, near_to_trains,  trainstationbenefits, 
                                     dist_min =100, dist_max=5_000, bikes_total = 800):
 
     # stop the big stream of text
@@ -241,12 +241,6 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         [prob.addVariable(name = f"bikes_{i}", vartype= xp.integer) for i in I]
         , dtype=xp.npvar
     )
-    
-    
-    # we only have bikes_total bikes
-    prob.addConstraint(
-        xp.Sum(bikes[i] for i in I) <= bikes_total
-    )
 
     
     allocated = np.array(
@@ -259,13 +253,12 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         [prob.addVariable(name=f"covered_train_{t}", vartype=xp.binary) for t in Trains]
         , dtype=xp.npvar
     )
-    gamma = 10_000  # reward for covering a train station
 
 
 
     ########### Objective function #############
     prob.setObjective(
-        xp.Sum(desire[i] * bikes[i] for i in I) + gamma * xp.Sum(train_covered[t] for t in Trains),
+        xp.Sum(desire[i] * bikes[i] for i in I) +  xp.Sum(train_covered[t] * trainstationbenefits[t] for t in Trains),
         sense=xp.maximize
     )
 
@@ -299,6 +292,8 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     prob.addConstraint(
         build[i] <= bikes[i] for i in I
     )
+        
+
     
     # we will not put more bikes in a location than there is desire for bikes
     # the plus one is to avoid issues with combining the above constraint and the connectedness constraint

@@ -91,7 +91,8 @@ demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old
 
 
 demand = demand/365
-
+trainstationnames = ['Edinburgh Waverley','Haymarket', 'Slateford', 'Wester Hailes', 'South Gyle', 'Curriehill', 'Brunstane', 'Newcraighall','Gateway ', 'Edinburgh business park ']
+trainstationbenefits = [80, 60, 40, 40, 30, 40, 40, 30, 40, 50 ]
 
 # sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
 #     desire=demand, dist_mat=dist_mat, bike_max=35,
@@ -99,8 +100,8 @@ demand = demand/365
 #     near_to_trains=near_to_trains,
 #     dist_min = 0.4, dist_max =2)
 sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
-    desire=demand, dist_mat=dist_mat, bike_max=30,
-    cost_bike=1000, cost_station=5000, budget=2_000_000, rev_per_bike = 1000,
+    desire=demand, dist_mat=dist_mat,trainstationbenefits = trainstationbenefits,  bike_max=30, 
+    cost_bike=1000, cost_station=5000, budget=1_000_000, rev_per_bike = 1000,
     near_to_trains=near_to_trains,
     dist_min = 0.4, dist_max =2)
 
