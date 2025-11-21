@@ -219,7 +219,7 @@ def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bik
 def create_and_solve_extended_model(desire, dist_mat, bike_max, 
                                     cost_bike, cost_station, budget,
                                     rev_per_bike, near_to_trains,
-                                    dist_min =100, dist_max=5_000):
+                                    dist_min =100, dist_max=5_000, bikes_total = 800):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
@@ -243,6 +243,12 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     )
     
     
+    # we only have bikes_total bikes
+    prob.addConstraint(
+        xp.Sum(bikes[i] for i in I) <= bikes_total
+    )
+
+    
     allocated = np.array(
         [[prob.addVariable(name=f'allocated_{i}_{j}', vartype=xp.binary) for j in I]
         for i in I]
@@ -258,10 +264,10 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
 
     ########### Objective function #############
-    # prob.setObjective(
-    #     xp.Sum(desire[i] * bikes[i] for i in I) + gamma * xp.Sum(train_covered[t] for t in Trains),
-    #     sense=xp.maximize
-    # )
+    prob.setObjective(
+        xp.Sum(desire[i] * bikes[i] for i in I) + gamma * xp.Sum(train_covered[t] for t in Trains),
+        sense=xp.maximize
+    )
 
 
     ########### Soft train-station coverage #############
@@ -277,10 +283,10 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     
     
     # if u want it to run fast use the below objective function 
-    prob.setObjective(
-        xp.Sum( (rev_per_bike * desire[i] - cost_bike) * bikes[i] for i in I ) - xp.Sum(cost_station * build[i] for i in I ) 
-        , sense = xp.maximize
-    )
+    # prob.setObjective(
+    #     xp.Sum( (rev_per_bike * desire[i] - cost_bike) * bikes[i] for i in I ) - xp.Sum(cost_station * build[i] for i in I ) 
+    #     , sense = xp.maximize
+    # )
     ########### constraints #############
 
     # we can place at most bikes_max bikes in each location
@@ -433,7 +439,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
         cycles = [ cycle for cycle in cycles if len(cycle) < size_s ]
         print(cycles)
         count+=1
-        if count ==4: break
+        if count == 50: break
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
