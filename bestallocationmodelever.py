@@ -93,12 +93,16 @@ demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + locations_gdf['old
 demand = demand/365
 
 
+# sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
+#     desire=demand, dist_mat=dist_mat, bike_max=35,
+#     cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
+#     near_to_trains=near_to_trains,
+#     dist_min = 0.4, dist_max =2)
 sol, mip, alloc_df, arcs = IP_models.create_and_solve_extended_model(
-    desire=demand, dist_mat=dist_mat, bike_max=35,
-    cost_bike=580, cost_station=20_000, budget=2_000_000,rev_per_bike = 1000 ,
+    desire=demand, dist_mat=dist_mat, bike_max=30,
+    cost_bike=1000, cost_station=5000, budget=1_000_000, rev_per_bike = 1000,
     near_to_trains=near_to_trains,
     dist_min = 0.4, dist_max =2)
-
 
 df = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
 
