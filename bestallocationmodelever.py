@@ -4,13 +4,10 @@ import IP_models
 from preprocessing import *
 from demandfuncs import *
 import pandas as pd 
-import folium
-from folium import CircleMarker
-from folium.plugins import HeatMap
 
 ######## Parameters 
 
-num_clusters = 500
+num_clusters = 400
 
 ######## 
 
@@ -99,7 +96,7 @@ os.mkdir(save_folder)
 
 
 print("Starting bike sensitivity to budget")
-budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=500_000)
+budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=100_000)
 bikes_used = np.zeros(budget_param_vals.shape)
 demand_met = np.zeros(budget_param_vals.shape)
 
@@ -130,9 +127,28 @@ bikes_used_as_budget_varies = pd.DataFrame({
 })
 print(bikes_used_as_budget_varies)
 
-bikes_used_as_budget_varies.to_csv(
-    path(save_folder, "varying_budget_to_effect_demand_met_and_bikes_used.csv")
+
+title = "varying_budget_to_effect_demand_met_and_bikes_used"
+_, ax = plt.subplots()
+ax.plot(
+    "budget", "daily_demand_met",
+     label= "daily_demand_met",
+     data= bikes_used_as_budget_varies,
+     color = "red", linewidth = 2
 )
+ax.plot(
+    "budget", "bikes_used",
+     label = "bikes_used",
+     data= bikes_used_as_budget_varies,
+     color = "blue", linewidth = 2
+)
+
+ax.legend()
+ax.set_title(title)
+plt.savefig(path(save_folder, title+".pdf"))
+plt.close()
+
+bikes_used_as_budget_varies.to_csv( path(save_folder, title+".csv" )  )
 print("done bikes sensitivity to budget")
 
 
