@@ -355,6 +355,8 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     # prob.write("problem","lp")
     if verbose:
         print("Solving first without connectedness")
+    else:
+        print("Solving")
     
     first_solve_start = perf_counter()
     prob.solve()
