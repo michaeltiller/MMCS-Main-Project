@@ -499,13 +499,21 @@ def predict_bike_count_MLP( new_x, show_plot=False, precomputed=False):
 def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=False):
     """Extract some basic stats from the solution"""
     out = dict()
-    
-    out["bikes_used"] = solu["bikes"].sum()
-    out["stations_built"] = solu["build"].sum()
+
+    #this was buggy so i broke it down
+    # idk what was wrong with pandas
+
+    bikes = solu["bikes"][ solu["bikes"] >0 ].to_numpy()
+    out["bikes_used"] = bikes.sum().sum()
+
+    x = solu["build"][ solu["build"] >0 ].to_numpy()
+    out["stations_built"] = x.sum()
+
+    x = solu["train_covered"][ solu["train_covered"] >0 ].to_numpy()
     out["trains_covered"] = train_solu["train_covered"].sum()
     
-    #this was buggy so i broke it down
-    reward = train_solu["train_benefit"][train_solu["train_covered"] ==1 ]
+    
+    reward = train_solu["train_benefit"][ train_solu["train_covered"] ==1 ].to_numpy()
     reward = int(reward.sum())
 
     out["train_stations_reward"] = reward
