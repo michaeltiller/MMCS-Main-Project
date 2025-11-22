@@ -50,10 +50,10 @@ old_demand = np.zeros(len(locations_gdf))
 old_demand[locs_with_demand] = counts
 
 
-traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())
+traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy(), precomputed=True)
 
-demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
-
+# demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
+demand = traffic_based_demand/2
 
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
@@ -61,17 +61,27 @@ dist_mat = get_dists_gps(locations_gdf)
 ###### get train stations ######
 
 train_stations = pd.read_csv('trainstations.csv')
+
+# we want to reward building near a station - the reward is the additional daily trips
+#    Edinburgh Waverley, Haymarket, Slateford, Wester Hailes, South Gyle,
+#    Curriehill, Brunstane, Newcraighall, Gateway,Edinburgh business park
+train_benefit = [80, 60, 40, 40, 30,
+                 40, 40, 30, 40, 50 ]
+pred_train_benefit = predict_bike_count_MLP(train_stations[["Latitude", "Longitude"]].to_numpy(), precomputed=True)
+# we really want the model to build near a station
+train_benefit = [ int(max(old, new/2)) for old, new in zip(train_benefit, pred_train_benefit)]
+
+# define whether a location is near each train station
 num_trains = train_stations.shape[0]
+train_lon, train_lat = train_stations["Longitude"].to_numpy(), train_stations["Latitude"].to_numpy()
 
 near_to_trains = np.zeros((num_trains, num_clusters), dtype = bool)
-
-train_lon, train_lat = train_stations["Longitude"].to_numpy(), train_stations["Latitude"].to_numpy()
 for t in range(num_trains):
-    near_to_trains[t] = haversine_np(
+    dist_to_train = haversine_np(
         train_lon[t], train_lat[t],
         loc_lon, loc_lat
         )
-    near_to_trains = near_to_trains < .4 #400 metres
+    near_to_trains[t] = dist_to_train <= .4 #400 metres
     print(f"Locs near {train_stations["Station"].iloc[t]} is {near_to_trains[t].sum()}")
 
 
@@ -79,17 +89,14 @@ for t in range(num_trains):
 
 sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat,
-#    Edinburgh Waverley, Haymarket, Slateford, Wester Hailes, South Gyle,
-#    Curriehill, Brunstane, Newcraighall, Gateway,Edinburgh business park
-    train_benefit = [80, 60, 40, 40, 30,
-                             40, 40, 30, 40, 50 ],
+    train_benefit=train_benefit,
     bike_max=30, # estimated from average of historical stations
     cost_bike=1000, 
     cost_station=5000, 
     budget=1_000_000, 
     near_trains=near_to_trains,
     dist_min = 0.4, #stations no closer than 400m
-    dist_max =2  #stations no more than 2km apart
+    dist_max =1  #stations no more than 1km apart
 )
 
 x = summarise_solution(sol, train_sol, True)
