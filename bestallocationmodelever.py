@@ -10,7 +10,7 @@ from folium.plugins import HeatMap
 
 ######## Parameters 
 
-num_clusters = 400
+num_clusters = 500
 
 ######## 
 
@@ -52,7 +52,7 @@ old_demand[locs_with_demand] = counts
 
 traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy(), precomputed=True)
 
-demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
+demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.4 + old_demand * 0.2)/365 + (traffic_based_demand/7)* .4
 
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
@@ -92,6 +92,13 @@ COST_STATION = 5_000
 DIST_MAX = 1
 BIKES_TOTAL = 800
 
+#### create a timestamp here for when we want to save any data later
+stamp = timestamp()  + f" clusters-{num_clusters:,}"
+save_folder = path("gen_data", stamp)
+os.mkdir(save_folder)
+
+
+print("Starting bike sensitivity to budget")
 budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=500_000)
 bikes_used = np.zeros(budget_param_vals.shape)
 demand_met = np.zeros(budget_param_vals.shape)
@@ -111,11 +118,10 @@ for i, budget_param in enumerate(budget_param_vals):
     bikes_total=BIKES_TOTAL,
     verbose=False
     )
-    x = summarise_solution(sol, train_sol, True)
+    x = summarise_solution(sol, train_sol, p_print=True)
 
     bikes_used[i] = x["bikes_used"]
     demand_met[i] = x["daily_demand_met"]
-
 
 bikes_used_as_budget_varies = pd.DataFrame({
     "budget":budget_param_vals,
@@ -124,87 +130,44 @@ bikes_used_as_budget_varies = pd.DataFrame({
 })
 print(bikes_used_as_budget_varies)
 
-save_folder = path("gen_data", "sensit " + timestamp() )
-os.mkdir(save_folder)
 bikes_used_as_budget_varies.to_csv(
     path(save_folder, "varying_budget_to_effect_demand_met_and_bikes_used.csv")
 )
-    
+print("done bikes sensitivity to budget")
 
 
-############## Plotting and saving output
 
-df = pd.concat([locations_gdf[['lat', 'lon']], sol], axis = 1)
+budget_for_phases = [500_000, 1_000_000,  2_000_000]
+phases = len(budget_for_phases)
+print(f"doing phases {budget_for_phases=}")
+for phase, budget_param in enumerate(budget_for_phases):
 
-m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
-
-# Add station markers
-for i, row in df.iterrows():
-    color = 'red' if row['build'] == 1 else 'grey'
-
-    radius = 4 + (row['bikes'] / df["bikes"].max()) * 10  # scales between 4–14 px
-
-    popup_text = (
-        f"<b>Build station:</b> {bool(row['build'])}<br>"
-        f"<b>Bikes:</b> {int(row['bikes'])}<br>"
-        f"<b>Demand:</b> {int(row['desire'])}<br>"
-        f"<b>Index:</b> {i}"
+    sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
+    desire=demand, dist_mat=dist_mat,
+    train_benefit=train_benefit,
+    bike_max=BIKE_MAX, 
+    cost_bike=COST_BIKE, 
+    cost_station=COST_STATION, 
+    budget=budget_param, # <----------
+    near_trains=near_to_trains,
+    dist_min = 0.4, #stations no closer than 400m
+    dist_max =DIST_MAX,  #stations no more than 1km apart
+    bikes_total=BIKES_TOTAL,
+    verbose=False
     )
-
-    CircleMarker(
-        location=[row['lat'], row['lon']],
-        radius=radius,
-        color=color,
-        weight=2,
-        fill=True,
-        fill_color=color,
-        fill_opacity=0.6,
-        popup=folium.Popup(popup_text, max_width=250)
-    ).add_to(m)
-
-
-for i in range(len(df)):
-    for j in range(len(df)):
-        if alloc_sol[i, j] == 1:
-            # Coordinates of the two stations
-            lat_i, lon_i = df.loc[i, ['lat', 'lon']]
-            lat_j, lon_j = df.loc[j, ['lat', 'lon']]
-
-            # Add a polyline for the allocation
-            folium.PolyLine(
-                locations=[(lat_i, lon_i), (lat_j, lon_j)],
-                color="blue",
-                weight=1.5,
-                opacity=0.6,
-                tooltip=f"{i} → {j}"
-            ).add_to(m)
-             
-for i, station in train_stations.iterrows():
+    summary = summarise_solution(sol, train_sol, COST_BIKE, COST_STATION)
+    print(f"Budget given: {budget_param:,}  budget used: {summary["budget_used"]:,}")
     
-    lat = station["Latitude"]
-    lon = station["Longitude"]
 
-    folium.Marker(
-        location= [lat, lon],
-        icon=folium.Icon(color='blue', icon='train', prefix='fa'),
-        popup=f"<b>{station["Station"]}</b><br>Covered:{train_sol["train_covered"].iloc[i]}<br>Reward:{train_benefit[i]}"
-    ).add_to(m)
+    # Plotting and saving output for this phase
+    m = make_map_from_sol(locations_gdf, train_stations,sol, alloc_sol, train_sol)
+    # m.show_in_browser()
 
+    tag = f"phase-{phase+1} budget-{budget_param} "
+    m.save(path(save_folder, tag+"the_map.html") )
+    sol.to_csv(path(save_folder, tag+"the_sol.csv"))
 
-
-stamp = timestamp() + f" {num_clusters=:,}"
-save_folder = path("gen_data", stamp)
-os.mkdir(save_folder)
-
-m.save(path(save_folder,"the_map.html") )
-
-sol.to_csv(path(save_folder, "the_sol.csv"))
-
-pd.DataFrame({
-    "demand":demand
-}).to_csv(path(save_folder,"demand.csv") )
-
-m.show_in_browser()
+print("done phases stuff")
 
 
 
