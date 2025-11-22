@@ -504,7 +504,7 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=
     # idk what was wrong with pandas
 
     bikes = solu["bikes"][ solu["bikes"] >0 ].to_numpy()
-    out["bikes_used"] = bikes.sum().sum()
+    out["bikes_used"] = bikes.sum()
 
     x = solu["build"][ solu["build"] >0 ].to_numpy()
     out["stations_built"] = x.sum()

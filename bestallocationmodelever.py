@@ -93,7 +93,8 @@ DIST_MAX = 1
 BIKES_TOTAL = 800
 
 budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=500_000)
-bikes_used = demand_met= np.zeros(budget_param_vals.shape)
+bikes_used = np.zeros(budget_param_vals.shape)
+demand_met = np.zeros(budget_param_vals.shape)
 
 for i, budget_param in enumerate(budget_param_vals):
 
@@ -110,7 +111,7 @@ for i, budget_param in enumerate(budget_param_vals):
     bikes_total=BIKES_TOTAL,
     verbose=False
     )
-    x = summarise_solution(sol, train_sol)
+    x = summarise_solution(sol, train_sol, True)
 
     bikes_used[i] = x["bikes_used"]
     demand_met[i] = x["daily_demand_met"]
