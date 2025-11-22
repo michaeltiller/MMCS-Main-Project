@@ -153,7 +153,7 @@ for i, row in df.iterrows():
         location=[row['lat'], row['lon']],
         radius=radius,
         color=color,
-        weight = 2,
+        weight=2,
         fill=True,
         fill_color=color,
         fill_opacity=0.6,
