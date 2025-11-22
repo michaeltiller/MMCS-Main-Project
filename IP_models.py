@@ -294,7 +294,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     # we will not put more bikes in a location than there is desire for bikes
     # the plus one is to avoid issues with combining the above constraint and the connectedness constraint
     prob.addConstraint(
-        bikes[i] <= desire[i] + 1 for i in I
+        bikes[i] <= max(desire[i],0) + 1 for i in I
     )
 
     # we have a total number of bikes ~800

@@ -52,8 +52,8 @@ old_demand[locs_with_demand] = counts
 
 traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy())
 
-demand = locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25 + traffic_based_demand* .5
-demand = demand/365
+demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
+
 
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
