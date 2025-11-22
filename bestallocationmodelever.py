@@ -92,7 +92,7 @@ COST_STATION = 5_000
 DIST_MAX = 1
 BIKES_TOTAL = 800
 
-budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=100_000)
+budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=500_000)
 bikes_used = demand_met= np.zeros(budget_param_vals.shape)
 
 for i, budget_param in enumerate(budget_param_vals):
@@ -114,6 +114,7 @@ for i, budget_param in enumerate(budget_param_vals):
 
     bikes_used[i] = x["bikes_used"]
     demand_met[i] = x["daily_demand_met"]
+
 
 bikes_used_as_budget_varies = pd.DataFrame({
     "budget":budget_param_vals,
@@ -140,7 +141,7 @@ m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
 for i, row in df.iterrows():
     color = 'red' if row['build'] == 1 else 'grey'
 
-    radius = 4 + (row['desire'] / df["desire"].max()) * 10  # scales between 4–14 px
+    radius = 4 + (row['bikes'] / df["bikes"].max()) * 10  # scales between 4–14 px
 
     popup_text = (
         f"<b>Build station:</b> {bool(row['build'])}<br>"
