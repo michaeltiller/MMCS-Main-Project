@@ -13,6 +13,7 @@ from time import perf_counter
 import requests, ujson
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
+import pickle
 
 def designate_weight(cat):
     """designate a POI's weight based off it's category.
@@ -413,7 +414,7 @@ def read_traffic_data():
     return traffic
 
 
-def predict_bike_count_MLP( new_x, show_plot=False):
+def predict_bike_count_MLP( new_x, show_plot=False, precomputed=False):
     """
     This predicts bike count data from the longitude and latitude of ``new_x``.
     It does this by looking at recent historical bike traffic at junctions in Edinburgh.
@@ -428,12 +429,25 @@ def predict_bike_count_MLP( new_x, show_plot=False):
     train_X = traffic[["latitude", "longitude"]].to_numpy()
     train_y =  traffic["pedal_cycles"].to_numpy()
 
-    # scaling the data improved performance
-    scaler = StandardScaler()
-    train_X = scaler.fit(train_X).transform(train_X)
-
     print(f"Using {train_X.shape[0]:,} observations to predict {new_x.shape[0]:,} outcomes")
 
+
+    # scaling the data improved performance
+    scaler = StandardScaler().fit(train_X)
+
+    if precomputed == True:
+        with open('mediocre_mlp.pkl', 'rb') as f:
+            mlp_mod = pickle.load(f)
+    
+    else:
+        train_X = scaler.transform(train_X)
+
+        mlp_mod = MLPRegressor(hidden_layer_sizes=(75, 50), solver='lbfgs',
+                    activation='relu', max_iter= 10_000)
+        mlp_mod.fit(train_X, train_y)
+
+        with open('mediocre_mlp.pkl', 'wb') as f:
+            pickle.dump(mlp_mod, f)
 
     def plot_preds_against_gps( y_pred, title=""):
         """Plot predictions on training data against training responses"""
@@ -449,9 +463,6 @@ def predict_bike_count_MLP( new_x, show_plot=False):
         plt.title(title + " training predictions")
         plt.show()
 
-    mlp_mod = MLPRegressor(hidden_layer_sizes=(75, 50), solver='lbfgs',
-                        activation='relu', max_iter= 10_000)
-    mlp_mod.fit(train_X, train_y)
 
     if show_plot:
         plot_preds_against_gps(mlp_mod.predict(train_X), "basic MLP")
@@ -477,6 +488,10 @@ def predict_bike_count_MLP( new_x, show_plot=False):
 
     # ensure that the new data is on the scale the model expects
     new_y_pred = mlp_mod.predict( scaler.transform(new_x) )
+
+    new_y_pred = new_y_pred.astype(int)
+    # sanity check
+    new_y_pred[new_y_pred <0 ] = 0
 
     return new_y_pred
 
@@ -611,25 +626,26 @@ if __name__ == "__main__":
 
     ### traffic data demo
 
-    traffic = read_traffic_data()
+    # traffic = read_traffic_data()
 
-    locals = traffic["local_authority_id"].unique() 
+    # locals = traffic["local_authority_id"].unique() 
 
-    col_local, col_traffic = create_colours_for_locs_and_assignments(
-        locals 
-        , traffic["local_authority_id"].to_numpy()
-    )
+    # col_local, col_traffic = create_colours_for_locs_and_assignments(
+    #     locals 
+    #     , traffic["local_authority_id"].to_numpy()
+    # )
 
 
-    _, ax = plt.subplots()
-    for loc in locals:
-        places = traffic["local_authority_id"] == loc
-        traffic[places].plot(ax=ax,
-                          color=col_traffic[places], alpha= .5
-                          , label = loc)
-    plt.legend()
-    plt.title("Traffic junctions with bikes coloured by local authority")
-    ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+    # _, ax = plt.subplots()
+    # for loc in locals:
+    #     places = traffic["local_authority_id"] == loc
+    #     traffic[places].plot(ax=ax,
+    #                       color=col_traffic[places], alpha= .5
+    #                       , label = loc)
+    # plt.legend()
+    # plt.title("Traffic junctions with bikes coloured by local authority")
+    # ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
 
-    plt.show()
+    # plt.show()
 
+    pass
