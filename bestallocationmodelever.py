@@ -52,8 +52,7 @@ old_demand[locs_with_demand] = counts
 
 traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_numpy(), precomputed=True)
 
-# demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
-demand = traffic_based_demand/2
+demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.25 + old_demand * 0.25)/365 + traffic_based_demand* .5
 
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
@@ -86,20 +85,50 @@ for t in range(num_trains):
 
 
 ################## Change Parameters here
+BUDGET = 500_000 
+BIKE_MAX = 30  # estimated from average of historical stations
+COST_BIKE = 1_000 + 500 # cost + 1 year maintainence
+COST_STATION = 5_000
+DIST_MAX = 1
+BIKES_TOTAL = 800
 
-sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
+budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=100_000)
+bikes_used = demand_met= np.zeros(budget_param_vals.shape)
+
+for i, budget_param in enumerate(budget_param_vals):
+
+    sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat,
     train_benefit=train_benefit,
-    bike_max=30, # estimated from average of historical stations
-    cost_bike=1000, 
-    cost_station=5000, 
-    budget=1_000_000, 
+    bike_max=BIKE_MAX, 
+    cost_bike=COST_BIKE, 
+    cost_station=COST_STATION, 
+    budget=budget_param, # <----------
     near_trains=near_to_trains,
     dist_min = 0.4, #stations no closer than 400m
-    dist_max =1  #stations no more than 1km apart
-)
+    dist_max =DIST_MAX,  #stations no more than 1km apart
+    bikes_total=BIKES_TOTAL,
+    verbose=False
+    )
+    x = summarise_solution(sol, train_sol)
 
-x = summarise_solution(sol, train_sol, True)
+    bikes_used[i] = x["bikes_used"]
+    demand_met[i] = x["daily_demand_met"]
+
+bikes_used_as_budget_varies = pd.DataFrame({
+    "budget":budget_param_vals,
+    "bikes_used":bikes_used,
+    "daily_demand_met": demand_met
+})
+print(bikes_used_as_budget_varies)
+
+save_folder = path("gen_data", "sensit " + timestamp() )
+os.mkdir(save_folder)
+bikes_used_as_budget_varies.to_csv(
+    path(save_folder, "varying_budget_to_effect_demand_met_and_bikes_used.csv")
+)
+    
+
 
 ############## Plotting and saving output
 
@@ -109,13 +138,14 @@ m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
 
 # Add station markers
 for i, row in df.iterrows():
-    color = 'green' if row['build'] == 1 else 'red'
-    max_bikes = df['bikes'].max()
-    radius = 4 + (row['bikes'] / max_bikes) * 10  # scales between 4–14 px
+    color = 'red' if row['build'] == 1 else 'grey'
+
+    radius = 4 + (row['desire'] / df["desire"].max()) * 10  # scales between 4–14 px
+
     popup_text = (
         f"<b>Build station:</b> {bool(row['build'])}<br>"
-        f"<b>Bikes:</b> {row['bikes']}<br>"
-        f"<b>Demand:</b> {row['desire']}<br>"
+        f"<b>Bikes:</b> {int(row['bikes'])}<br>"
+        f"<b>Demand:</b> {int(row['desire'])}<br>"
         f"<b>Index:</b> {i}"
     )
 
@@ -123,13 +153,13 @@ for i, row in df.iterrows():
         location=[row['lat'], row['lon']],
         radius=radius,
         color=color,
+        weight = 2,
         fill=True,
         fill_color=color,
         fill_opacity=0.6,
         popup=folium.Popup(popup_text, max_width=250)
     ).add_to(m)
 
-# alloc_mat = alloc_sol.values
 
 for i in range(len(df)):
     for j in range(len(df)):
@@ -142,21 +172,20 @@ for i in range(len(df)):
             folium.PolyLine(
                 locations=[(lat_i, lon_i), (lat_j, lon_j)],
                 color="blue",
-                weight=3,
+                weight=1.5,
                 opacity=0.6,
                 tooltip=f"{i} → {j}"
             ).add_to(m)
-            
-            
-            
-
-for _, station in train_stations.iterrows():
+             
+for i, station in train_stations.iterrows():
+    
     lat = station["Latitude"]
     lon = station["Longitude"]
+
     folium.Marker(
         location= [lat, lon],
         icon=folium.Icon(color='blue', icon='train', prefix='fa'),
-        popup=f"<b>Train Station</b><br>{station["Station"]}<br>Lat: {lat}<br>Lon: {lon}"
+        popup=f"<b>{station["Station"]}</b><br>Covered:{train_sol["train_covered"].iloc[i]}<br>Reward:{train_benefit[i]}"
     ).add_to(m)
 
 
