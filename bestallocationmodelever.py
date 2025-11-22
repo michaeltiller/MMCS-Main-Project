@@ -91,7 +91,7 @@ sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
     desire=demand, dist_mat=dist_mat,
     train_benefit=train_benefit,
     bike_max=30, # estimated from average of historical stations
-    cost_bike=1000, 
+    cost_bike=1500, # cost + maintenance per bike per year 
     cost_station=5000, 
     budget=1_000_000, 
     near_trains=near_to_trains,
@@ -109,7 +109,7 @@ m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
 
 # Add station markers
 for i, row in df.iterrows():
-    color = 'green' if row['build'] == 1 else 'red'
+    color = 'red' if row['build'] == 1 else 'gray'
     max_bikes = df['bikes'].max()
     radius = 4 + (row['bikes'] / max_bikes) * 10  # scales between 4–14 px
     popup_text = (
@@ -123,6 +123,7 @@ for i, row in df.iterrows():
         location=[row['lat'], row['lon']],
         radius=radius,
         color=color,
+        weight=2,
         fill=True,
         fill_color=color,
         fill_opacity=0.6,
@@ -142,7 +143,7 @@ for i in range(len(df)):
             folium.PolyLine(
                 locations=[(lat_i, lon_i), (lat_j, lon_j)],
                 color="blue",
-                weight=3,
+                weight=1.5,
                 opacity=0.6,
                 tooltip=f"{i} → {j}"
             ).add_to(m)
