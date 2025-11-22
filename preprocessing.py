@@ -487,7 +487,7 @@ def predict_bike_count_MLP( new_x, show_plot=False, precomputed=False):
 
 
     # ensure that the new data is on the scale the model expects
-    new_y_pred = mlp_mod.predict( scaler.transform(new_x) )
+    new_y_pred = mlp_mod.predict( scaler.transform(new_x) )/2
 
     new_y_pred = new_y_pred.astype(int)
     # sanity check
