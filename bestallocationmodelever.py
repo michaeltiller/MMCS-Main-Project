@@ -67,9 +67,9 @@ train_stations = pd.read_csv('trainstations.csv')
 #    Curriehill, Brunstane, Newcraighall, Gateway,Edinburgh business park
 train_benefit = [80, 60, 40, 40, 30,
                  40, 40, 30, 40, 50 ]
-pred_train_benefit = predict_bike_count_MLP(train_stations[["Latitude", "Longitude"]].to_numpy(), precomputed=True)
+# pred_train_benefit = predict_bike_count_MLP(train_stations[["Latitude", "Longitude"]].to_numpy(), precomputed=True)
 # we really want the model to build near a station
-train_benefit = [ int(max(old, new/2)) for old, new in zip(train_benefit, pred_train_benefit)]
+# train_benefit = [ int(max(old, new/2)) for old, new in zip(train_benefit, pred_train_benefit)]
 
 # define whether a location is near each train station
 num_trains = train_stations.shape[0]
