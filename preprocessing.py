@@ -158,8 +158,13 @@ def get_distances_threaded(coords_arr):
 def get_historical_trips(and_end_points = False):
     """ get the demand for each potential location.
     returns it as a 2D array of longitude and latitude 
-     """
+    """
+
+    if not and_end_points:
+        return pd.read_csv("all_historical_start_points.csv")
+
     s = perf_counter()
+
     # # read the trip data from csv into dataframes
     filenames = glob.glob("*.csv", root_dir="cyclehire-cleandata") #regex
     trips = pd.concat([ pd.read_csv(path("cyclehire-cleandata", f )) for f in filenames  ])
@@ -188,6 +193,13 @@ def get_historical_trips(and_end_points = False):
 
     e = perf_counter()
     print(f"reading historical data took {e-s:.0f} seconds")
+
+    f_name = "all_historical_start_points"
+    if and_end_points:
+        f_name += "_and_end_points"
+    f_name += ".csv"
+    print("saving as ", f_name)
+    df.to_csv(f_name)
 
     return df
 
