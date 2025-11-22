@@ -219,7 +219,8 @@ def create_and_solve_basic_distmin_model(desire, dist_mat, near_centre, cost_bik
 def create_and_solve_extended_model(desire, dist_mat, bike_max, 
                                     cost_bike, cost_station, budget,
                                     near_trains,  train_benefit, 
-                                    dist_min =0, dist_max=5, bikes_total = 800):
+                                    dist_min =0, dist_max=5,
+                                    bikes_total = 800, verbose = True):
 
     # stop the big stream of text
     xp.setOutputEnabled(False)
@@ -352,16 +353,19 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
     ########## Solving ###########
     # Write problem statement to file, for debugging
     # prob.write("problem","lp")
- 
-    print("Solving first without connectedness")
-    solve_start = perf_counter()
+    if verbose:
+        print("Solving first without connectedness")
+    
+    first_solve_start = perf_counter()
     prob.solve()
-    solve_end = perf_counter()
-    print(f"Solved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
+    first_solve_end = perf_counter()
 
-    #mip gap 
-    MIP_gap= get_MIP_gap(prob)
-    print(f"{MIP_gap=:.2%}")
+    if verbose:
+        print(f"Solved in {first_solve_end-first_solve_start:.0f} seconds with {desire.shape[0]:,} variables")
+
+        #mip gap 
+        MIP_gap= get_MIP_gap(prob)
+        print(f"{MIP_gap=:.2%}")
 
 
 
@@ -382,6 +386,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
 
     count=0
+    resolve_end = first_solve_end #edge case
     while cycles:
 
         prob.addConstraint(
@@ -391,11 +396,13 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
             for s in cycles
         )
 
-        print(f"Resolving due to {len(cycles)} cycles")
-        solve_start = perf_counter()
+        if verbose:
+            print(f"Resolving due to {len(cycles)} cycles")
+        resolve_start = perf_counter()
         prob.solve()
-        solve_end = perf_counter()
-        print(f"Resolved in {solve_end-solve_start:.0f} seconds with {desire.shape[0]:,} variables")
+        resolve_end = perf_counter()
+        if verbose:
+            print(f"Resolved in {resolve_end-resolve_start:.0f} seconds with {desire.shape[0]:,} variables")
     
         arcs = []
         temp = prob.getSolution(allocated)
@@ -417,7 +424,7 @@ def create_and_solve_extended_model(desire, dist_mat, bike_max,
 
     #mip gap 
     MIP_gap= get_MIP_gap(prob)
-    print(f"final {MIP_gap=:.2%}")
+    print(f"total solving time {resolve_end-first_solve_start:.0f} final {MIP_gap=:.2%}")
 
     # look at the solution
     solution  = pd.DataFrame({
