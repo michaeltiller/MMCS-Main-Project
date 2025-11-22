@@ -14,6 +14,9 @@ import requests, ujson
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 import pickle
+import folium
+from folium import CircleMarker
+
 
 def designate_weight(cat):
     """designate a POI's weight based off it's category.
@@ -525,7 +528,64 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=
 
     return out
 
+def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_solu):
 
+    df = pd.concat([locs_gdf[['lat', 'lon']], basic_solu], axis = 1)
+
+    m = folium.Map(location=[df['lat'].mean(), df['lon'].mean()], zoom_start=13)
+
+    # Add station markers
+    for i, row in df.iterrows():
+        color = 'red' if row['build'] == 1 else 'grey'
+
+        radius = 4 + (row['bikes'] / df["bikes"].max()) * 10  # scales between 4–14 px
+
+        popup_text = (
+            f"<b>Build station:</b> {bool(row['build'])}<br>"
+            f"<b>Bikes:</b> {int(row['bikes'])}<br>"
+            f"<b>Demand:</b> {int(row['desire'])}<br>"
+            f"<b>Index:</b> {i}"
+        )
+
+        CircleMarker(
+            location=[row['lat'], row['lon']],
+            radius=radius,
+            color=color,
+            weight=2,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.6,
+            popup=folium.Popup(popup_text, max_width=250)
+        ).add_to(m)
+
+
+    for i in range(len(df)):
+        for j in range(len(df)):
+            if alloc_solu[i, j] == 1:
+                # Coordinates of the two stations
+                lat_i, lon_i = df.loc[i, ['lat', 'lon']]
+                lat_j, lon_j = df.loc[j, ['lat', 'lon']]
+
+                # Add a polyline for the allocation
+                folium.PolyLine(
+                    locations=[(lat_i, lon_i), (lat_j, lon_j)],
+                    color="blue",
+                    weight=1.5,
+                    opacity=0.6,
+                    tooltip=f"{i} → {j}"
+                ).add_to(m)
+                
+    for i, station in train_stations.iterrows():
+        
+        lat = station["Latitude"]
+        lon = station["Longitude"]
+
+        folium.Marker(
+            location= [lat, lon],
+            icon=folium.Icon(color='blue', icon='train', prefix='fa'),
+            popup=f"<b>{station["Station"]}</b><br>Covered:{train_solu["train_covered"].iloc[i]}<br>Reward:{train_solu["train_benefit"].iloc[i]}"
+        ).add_to(m)
+    return m
 
 if __name__ == "__main__":
 
