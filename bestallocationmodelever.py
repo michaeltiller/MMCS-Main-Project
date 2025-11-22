@@ -149,6 +149,56 @@ plt.savefig(path(save_folder, title+".pdf"))
 plt.close()
 
 bikes_used_as_budget_varies.to_csv( path(save_folder, title+".csv" )  )
+
+
+bike_limits = np.arange(500, 1_000, 100)
+budgets_used = np.zeros(bike_limits.shape)
+b = 1_500_000
+for i, bike_limit in enumerate(bike_limits):
+
+    sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
+        desire=demand, dist_mat=dist_mat,
+        train_benefit=train_benefit,
+        bike_max=BIKE_MAX, 
+        cost_bike=COST_BIKE, 
+        cost_station=COST_STATION, 
+        budget= b, # <----------
+        near_trains=near_to_trains,
+        dist_min = 0.4, #stations no closer than 400m
+        dist_max =DIST_MAX,  #stations no more than 1km apart
+        bikes_total=bike_limit, # <---------
+        verbose=False
+    )
+    x = summarise_solution(sol, train_sol, p_print=True)
+    print(f"new {bike_limit=}, used:{ x["budget_used"]:,}  budget give:{b:,}")
+
+    budgets_used[i] = x["budget_used"]
+
+budget_used_as_bikes_vary = pd.DataFrame({
+    "Budget_used" : budgets_used,
+    "total_bikes" : bike_limits
+})
+
+print(budget_used_as_bikes_vary)
+
+
+title = f"vary_total_bike_limit_to_effect_budget_used_of {b}"
+_, ax = plt.subplots()
+ax.plot(
+    "total_bikes", "Budget_used",
+     label= "Budget_used",
+     data= budget_used_as_bikes_vary,
+     color = "blue", linewidth = 2
+)
+
+ax.set_title(title)
+plt.savefig(path(save_folder, title+".pdf"))
+plt.close()
+
+budget_used_as_bikes_vary.to_csv( path(save_folder, title+".csv" )  )
+
+
+
 print("done bikes sensitivity to budget")
 
 
