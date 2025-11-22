@@ -499,7 +499,8 @@ def predict_bike_count_MLP( new_x, show_plot=False, precomputed=False):
     return new_y_pred
 
 
-def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=False):
+def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame,
+                        bike_cost= 1500, station_cost = 5000, p_print=False):
     """Extract some basic stats from the solution"""
     out = dict()
 
@@ -522,7 +523,9 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=
     out["train_stations_reward"] = reward
     out["daily_demand_met"] = reward + out["bikes_used"]
 
-    if pretty_print:
+    out["budget_used"] = bike_cost*out["bikes_used"] + station_cost*out["stations_built"]
+
+    if p_print:
         for key, value in out.items():
             print(f"{key}:{value}")
 
