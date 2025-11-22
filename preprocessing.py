@@ -509,7 +509,7 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame, pretty_print=
     x = solu["build"][ solu["build"] >0 ].to_numpy()
     out["stations_built"] = x.sum()
 
-    x = solu["train_covered"][ solu["train_covered"] >0 ].to_numpy()
+    x = train_solu["train_covered"][ train_solu["train_covered"] >0 ].to_numpy()
     out["trains_covered"] = train_solu["train_covered"].sum()
     
     
