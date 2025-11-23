@@ -96,7 +96,7 @@ os.mkdir(save_folder)
 
 
 print("Starting bike sensitivity to budget")
-budget_param_vals = np.arange(start= 100_000, stop=2_000_000, step=100_000)
+budget_param_vals = np.arange(start= 200_000, stop=2_000_000, step=100_000)
 bikes_used = np.zeros(budget_param_vals.shape)
 demand_met = np.zeros(budget_param_vals.shape)
 
@@ -112,7 +112,7 @@ for i, budget_param in enumerate(budget_param_vals):
     near_trains=near_to_trains,
     dist_min = 0.4, #stations no closer than 400m
     dist_max =DIST_MAX,  #stations no more than 1km apart
-    bikes_total=BIKES_TOTAL,
+    bikes_total=1_000,
     verbose=False
     )
     x = summarise_solution(sol, train_sol, p_print=True)
