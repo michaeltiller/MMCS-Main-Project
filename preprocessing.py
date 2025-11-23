@@ -522,6 +522,7 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame,
 
     out["train_stations_reward"] = reward
     out["daily_demand_met"] = reward + out["bikes_used"]
+    out["daily_demand_met_percentage"] = out["daily_demand_met"]/solu["desire"].sum()
 
     out["budget_used"] = bike_cost*out["bikes_used"] + station_cost*out["stations_built"]
 
@@ -531,7 +532,7 @@ def summarise_solution(solu:pd.DataFrame, train_solu:pd.DataFrame,
 
     return out
 
-def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_solu):
+def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_solu, show_all=True):
 
     df = pd.concat([locs_gdf[['lat', 'lon']], basic_solu], axis = 1)
 
@@ -539,27 +540,28 @@ def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_so
 
     # Add station markers
     for i, row in df.iterrows():
-        color = 'red' if row['build'] == 1 else 'grey'
+        if show_all or (row["build"] == 1):
+            color = 'red' if row['build'] == 1 else 'grey'
 
-        radius = 4 + (row['bikes'] / df["bikes"].max()) * 10  # scales between 4–14 px
+            radius = 4 + (row['bikes'] / df["bikes"].max()) * 6  # scales between 4–14 px
 
-        popup_text = (
-            f"<b>Build station:</b> {bool(row['build'])}<br>"
-            f"<b>Bikes:</b> {int(row['bikes'])}<br>"
-            f"<b>Demand:</b> {int(row['desire'])}<br>"
-            f"<b>Index:</b> {i}"
-        )
+            popup_text = (
+                f"<b>Build station:</b> {bool(row['build'])}<br>"
+                f"<b>Bikes:</b> {int(row['bikes'])}<br>"
+                f"<b>Demand:</b> {int(row['desire'])}<br>"
+                f"<b>Index:</b> {i}"
+            )
 
-        CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=radius,
-            color=color,
-            weight=2,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.6,
-            popup=folium.Popup(popup_text, max_width=250)
-        ).add_to(m)
+            CircleMarker(
+                location=[row['lat'], row['lon']],
+                radius=radius,
+                color=color,
+                weight=2,
+                fill=True,
+                fill_color=color,
+                fill_opacity=1.0,
+                popup=folium.Popup(popup_text, max_width=250)
+            ).add_to(m)
 
 
     for i in range(len(df)):
@@ -572,9 +574,9 @@ def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_so
                 # Add a polyline for the allocation
                 folium.PolyLine(
                     locations=[(lat_i, lon_i), (lat_j, lon_j)],
-                    color="blue",
+                    color="red",
                     weight=1.5,
-                    opacity=0.6,
+                    opacity=1.0,
                     tooltip=f"{i} → {j}"
                 ).add_to(m)
                 
@@ -583,11 +585,13 @@ def make_map_from_sol(locs_gdf, train_stations, basic_solu, alloc_solu, train_so
         lat = station["Latitude"]
         lon = station["Longitude"]
 
-        folium.Marker(
-            location= [lat, lon],
-            icon=folium.Icon(color='blue', icon='train', prefix='fa'),
-            popup=f"<b>{station["Station"]}</b><br>Covered:{train_solu["train_covered"].iloc[i]}<br>Reward:{train_solu["train_benefit"].iloc[i]}"
-        ).add_to(m)
+        if show_all or (train_solu["train_covered"].iloc[i] ==1):
+            folium.Marker(
+                location= [lat, lon],
+                icon=folium.Icon(color='blue', icon='train', prefix='fa'),
+                popup=f"<b>{station["Station"]}</b><br>Covered:{train_solu["train_covered"].iloc[i]}<br>Reward:{train_solu["train_benefit"].iloc[i]}"
+            ).add_to(m)
+
     return m
 
 if __name__ == "__main__":

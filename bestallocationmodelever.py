@@ -51,6 +51,8 @@ traffic_based_demand = predict_bike_count_MLP(locations_gdf[["lat", "lon"]].to_n
 
 demand = (locations_gdf['prediced_Start_Trip_Counts'] * 0.4 + old_demand * 0.2)/365 + (traffic_based_demand/7)* .4
 
+print(f"Total demand is  {demand.sum():.0f} mean demand is {demand.mean():.0f}")
+# 1/0
 #### Get Distances #########
 dist_mat = get_dists_gps(locations_gdf)
 
@@ -96,9 +98,11 @@ os.mkdir(save_folder)
 
 
 print("Starting bike sensitivity to budget")
-budget_param_vals = np.arange(start= 200_000, stop=2_000_000, step=100_000)
+budget_param_vals = np.arange(start= 200_000, stop=2_000_000+1, step=100_000)
 bikes_used = np.zeros(budget_param_vals.shape)
 demand_met = np.zeros(budget_param_vals.shape)
+demand_met_perc = np.zeros(budget_param_vals.shape)
+
 
 for i, budget_param in enumerate(budget_param_vals):
 
@@ -119,11 +123,13 @@ for i, budget_param in enumerate(budget_param_vals):
 
     bikes_used[i] = x["bikes_used"]
     demand_met[i] = x["daily_demand_met"]
+    demand_met_perc[i] = x["daily_demand_met_percentage"]
 
 bikes_used_as_budget_varies = pd.DataFrame({
     "budget":budget_param_vals,
     "bikes_used":bikes_used,
-    "daily_demand_met": demand_met
+    "daily_demand_met": demand_met,
+    "daily_demand_met_percentage":demand_met_perc
 })
 print(bikes_used_as_budget_varies)
 
@@ -151,51 +157,51 @@ plt.close()
 bikes_used_as_budget_varies.to_csv( path(save_folder, title+".csv" )  )
 
 
-bike_limits = np.arange(500, 1_000, 100)
-budgets_used = np.zeros(bike_limits.shape)
-b = 1_500_000
-for i, bike_limit in enumerate(bike_limits):
+# bike_limits = np.arange(500, 1_000, 100)
+# budgets_used = np.zeros(bike_limits.shape)
+# b = 1_500_000
+# for i, bike_limit in enumerate(bike_limits):
 
-    sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
-        desire=demand, dist_mat=dist_mat,
-        train_benefit=train_benefit,
-        bike_max=BIKE_MAX, 
-        cost_bike=COST_BIKE, 
-        cost_station=COST_STATION, 
-        budget= b, # <----------
-        near_trains=near_to_trains,
-        dist_min = 0.4, #stations no closer than 400m
-        dist_max =DIST_MAX,  #stations no more than 1km apart
-        bikes_total=bike_limit, # <---------
-        verbose=False
-    )
-    x = summarise_solution(sol, train_sol, p_print=True)
-    print(f"new {bike_limit=}, used:{ x["budget_used"]:,}  budget give:{b:,}")
+#     sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
+#         desire=demand, dist_mat=dist_mat,
+#         train_benefit=train_benefit,
+#         bike_max=BIKE_MAX, 
+#         cost_bike=COST_BIKE, 
+#         cost_station=COST_STATION, 
+#         budget= b, # <----------
+#         near_trains=near_to_trains,
+#         dist_min = 0.4, #stations no closer than 400m
+#         dist_max =DIST_MAX,  #stations no more than 1km apart
+#         bikes_total=bike_limit, # <---------
+#         verbose=False
+#     )
+#     x = summarise_solution(sol, train_sol, p_print=True)
+#     print(f"new {bike_limit=}, used:{ x["budget_used"]:,}  budget give:{b:,}")
 
-    budgets_used[i] = x["budget_used"]
+#     budgets_used[i] = x["budget_used"]
 
-budget_used_as_bikes_vary = pd.DataFrame({
-    "Budget_used" : budgets_used,
-    "total_bikes" : bike_limits
-})
+# budget_used_as_bikes_vary = pd.DataFrame({
+#     "Budget_used" : budgets_used,
+#     "total_bikes" : bike_limits
+# })
 
-print(budget_used_as_bikes_vary)
+# print(budget_used_as_bikes_vary)
 
 
-title = f"vary_total_bike_limit_to_effect_budget_used_of {b}"
-_, ax = plt.subplots()
-ax.plot(
-    "total_bikes", "Budget_used",
-     label= "Budget_used",
-     data= budget_used_as_bikes_vary,
-     color = "blue", linewidth = 2
-)
+# title = f"vary_total_bike_limit_to_effect_budget_used_of {b}"
+# _, ax = plt.subplots()
+# ax.plot(
+#     "total_bikes", "Budget_used",
+#      label= "Budget_used",
+#      data= budget_used_as_bikes_vary,
+#      color = "blue", linewidth = 2
+# )
 
-ax.set_title(title)
-plt.savefig(path(save_folder, title+".pdf"))
-plt.close()
+# ax.set_title(title)
+# plt.savefig(path(save_folder, title+".pdf"))
+# plt.close()
 
-budget_used_as_bikes_vary.to_csv( path(save_folder, title+".csv" )  )
+# budget_used_as_bikes_vary.to_csv( path(save_folder, title+".csv" )  )
 
 
 
@@ -223,6 +229,7 @@ for phase, budget_param in enumerate(budget_for_phases):
     )
     summary = summarise_solution(sol, train_sol, COST_BIKE, COST_STATION)
     print(f"Budget given: {budget_param:,}  budget used: {summary["budget_used"]:,}")
+    print(f"demand met {summary["daily_demand_met"]:.0f} out of {demand.sum():.0f} is {summary["daily_demand_met_percentage"]:.0%}")
     
 
     # Plotting and saving output for this phase
