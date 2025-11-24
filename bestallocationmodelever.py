@@ -99,11 +99,8 @@ os.mkdir(save_folder)
 
 print("Starting bike sensitivity to budget")
 budget_param_vals = np.arange(start= 200_000, stop=2_000_000+1, step=100_000)
-bikes_used = np.zeros(budget_param_vals.shape)
-demand_met = np.zeros(budget_param_vals.shape)
-demand_met_perc = np.zeros(budget_param_vals.shape)
 
-
+summaries = []
 for i, budget_param in enumerate(budget_param_vals):
 
     sol, mip, alloc_sol, train_sol  = IP_models.create_and_solve_extended_model(
@@ -121,17 +118,12 @@ for i, budget_param in enumerate(budget_param_vals):
     )
     x = summarise_solution(sol, train_sol, p_print=True)
 
-    bikes_used[i] = x["bikes_used"]
-    demand_met[i] = x["daily_demand_met"]
-    demand_met_perc[i] = x["daily_demand_met_percentage"]
+    #pandas is being awkward about making dataframes out of dictionaries
+    summaries.append( pd.DataFrame.from_dict(dict( (key, [value]) for key, value in x.items()  )) )
 
-bikes_used_as_budget_varies = pd.DataFrame({
-    "budget":budget_param_vals,
-    "bikes_used":bikes_used,
-    "daily_demand_met": demand_met,
-    "daily_demand_met_percentage":demand_met_perc
-})
+bikes_used_as_budget_varies = pd.concat(summaries, ignore_index=True)
 print(bikes_used_as_budget_varies)
+bikes_used_as_budget_varies["budget"] = budget_param_vals
 
 
 title = "varying_budget_to_effect_demand_met_and_bikes_used"
